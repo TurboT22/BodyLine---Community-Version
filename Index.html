@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Upper Body Tracking Prototype</title>
+<style>
+  body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+  }
+  video, canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: scaleX(-1);
+  }
+</style>
+</head>
+<body>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Simple helpers
+function drawDot(x, y, r = 6) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawLine(a, b) {
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+}
+
+// Calculate rotation from two points
+function getRotation(a, b) {
+  return Math.atan2(b.y - a.y, b.x - a.x);
+}
+
+// MediaPipe setup
+const pose = new Pose({
+  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+});
+
+pose.setOptions({
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  enableSegmentation: false
+});
+
+pose.onResults(results => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "lime";
+  ctx.fillStyle = "red";
+  ctx.lineWidth = 3;
+
+  if (!results.poseLandmarks) return;
+
+  const lm = results.poseLandmarks;
+
+  // Pick ONLY upper-body joints
+  const joints = {
+    head: lm[0],
+    chest: lm[12],
+    leftShoulder: lm[11],
+    rightShoulder: lm[12],
+    leftElbow: lm[13],
+    rightElbow: lm[14],
+    leftWrist: lm[15],
+    rightWrist: lm[16]
+  };
+
+  // Convert to screen space
+  for (let k in joints) {
+    joints[k] = {
+      x: joints[k].x * canvas.width,
+      y: joints[k].y * canvas.height
+    };
+  }
+
+  // Draw skeleton
+  drawLine(joints.leftShoulder, joints.rightShoulder);
+  drawLine(joints.leftShoulder, joints.leftElbow);
+  drawLine(joints.leftElbow, joints.leftWrist);
+  drawLine(joints.rightShoulder, joints.rightElbow);
+  drawLine(joints.rightElbow, joints.rightWrist);
+
+  // Draw dots
+  Object.values(joints).forEach(j => drawDot(j.x, j.y));
+
+  // Rotation data (example output)
+  const data = {
+    leftUpperArmRot: getRotation(joints.leftShoulder, joints.leftElbow),
+    leftLowerArmRot: getRotation(joints.leftElbow, joints.leftWrist),
+    rightUpperArmRot: getRotation(joints.rightShoulder, joints.rightElbow),
+    rightLowerArmRot: getRotation(joints.rightElbow, joints.rightWrist),
+    torsoRot: getRotation(joints.leftShoulder, joints.rightShoulder)
+  };
+
+  // This is where you'd dump data later
+  console.log(data);
+});
+
+// Camera
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await pose.send({ image: video });
+  },
+  width: 1280,
+  height: 720
+});
+
+camera.start();
+</script>
+</body>
+</html>
