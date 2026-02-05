@@ -2,66 +2,99 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Sandbox Upper-Body Tracker</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sandbox Mobile Body Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
 <style>
 html, body {
-    margin: 0;
-    padding: 0;
-    background: black;
-    overflow: hidden;
-    font-family: monospace;
-    color: #0f0;
+  margin: 0;
+  padding: 0;
+  background: black;
+  overflow: hidden;
+  font-family: monospace;
+  color: #0f0;
+  touch-action: none;
 }
 
 #video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-origin: top left;
-    display: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  display: none;
 }
 
 #overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-}
-
-#debug {
-    position: fixed;
-    top: 8px;
-    left: 8px;
-    background: rgba(0,0,0,0.7);
-    padding: 8px;
-    border: 1px solid #0f0;
-    font-size: 12px;
-    white-space: pre;
-    z-index: 10;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 #waiting {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 20px;
-    background: black;
-    z-index: 100;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: black;
+  color: white;
+  font-size: 18px;
+  z-index: 100;
+}
+
+#debug {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid #0f0;
+  padding: 6px;
+  font-size: 11px;
+  white-space: pre;
+  z-index: 10;
+}
+
+#controls {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.85);
+  padding: 10px;
+  z-index: 20;
+}
+
+.control {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+input[type=range] {
+  width: 100%;
 }
 </style>
 </head>
 
 <body>
 
-<div id="waiting">Waiting for camera permission…</div>
+<div id="waiting">Waiting for camera…</div>
 
 <video id="video" autoplay muted playsinline></video>
 <canvas id="overlay"></canvas>
-<div id="debug">Loading tracker…</div>
+
+<div id="debug">Loading…</div>
+
+<div id="controls">
+  <div class="control">Video Scale
+    <input type="range" id="scale" min="0.6" max="2.0" step="0.01" value="0.9">
+  </div>
+  <div class="control">Offset X
+    <input type="range" id="offsetX" min="-400" max="400" step="1" value="0">
+  </div>
+  <div class="control">Offset Y
+    <input type="range" id="offsetY" min="-400" max="400" step="1" value="0">
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
@@ -71,118 +104,96 @@ html, body {
 const video = document.getElementById("video");
 const canvas = document.getElementById("overlay");
 const ctx = canvas.getContext("2d");
-const debug = document.getElementById("debug");
 const waiting = document.getElementById("waiting");
+const debug = document.getElementById("debug");
 
-/* ======================
-   VIDEO TRANSFORM
-====================== */
-let videoScale = 1.4;
-let videoOffsetX = -200;
-let videoOffsetY = 0;
+const scaleEl = document.getElementById("scale");
+const offsetXEl = document.getElementById("offsetX");
+const offsetYEl = document.getElementById("offsetY");
 
-/* ======================
-   FPS
-====================== */
 let lastTime = performance.now();
 let fps = 0;
 
-/* ======================
-   RESIZE
-====================== */
 function resize() {
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
-    video.style.transform =
-        `translate(${videoOffsetX}px, ${videoOffsetY}px) scale(${videoScale})`;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+
+  video.style.transform =
+    `translate(${offsetXEl.value}px, ${offsetYEl.value}px)
+     scale(${scaleEl.value})
+     scaleX(-1)`;
 }
 addEventListener("resize", resize);
 
-/* ======================
-   MEDIAPIPE POSE
-====================== */
+scaleEl.oninput = resize;
+offsetXEl.oninput = resize;
+offsetYEl.oninput = resize;
+
 const pose = new Pose({
-    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
 });
 
 pose.setOptions({
-    modelComplexity: 1,
-    smoothLandmarks: true,
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
 });
 
 pose.onResults(onResults);
 
-/* ======================
-   CAMERA
-====================== */
 const cam = new Camera(video, {
-    onFrame: async () => {
-        await pose.send({ image: video });
-    },
-    width: 1280,
-    height: 720
+  onFrame: async () => {
+    await pose.send({ image: video });
+  },
+  width: 720,
+  height: 1280
 });
 
-/* ======================
-   CONNECTIONS (NO LEGS)
-====================== */
-const UPPER_CONNECTIONS = [
-    [11,12], // shoulders
-    [11,13],[13,15], // left arm
-    [12,14],[14,16], // right arm
-    [11,23],[12,24]  // torso to hips
+const CONNECTIONS = [
+  [11,12],
+  [11,13],[13,15],
+  [12,14],[14,16],
+  [11,23],[12,24]
 ];
 
-/* ======================
-   RESULTS
-====================== */
 function onResults(r) {
-    waiting.style.display = "none";
-    video.style.display = "block";
-    resize();
+  waiting.style.display = "none";
+  video.style.display = "block";
+  resize();
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if (!r.poseLandmarks) return;
 
-    if (!r.poseLandmarks) return;
+  const lm = r.poseLandmarks;
 
-    const lm = r.poseLandmarks;
+  drawConnectors(ctx, lm, CONNECTIONS, { color: "#00ff00", lineWidth: 2 });
 
-    /* Draw torso + arms */
-    drawConnectors(ctx, lm, UPPER_CONNECTIONS, {
-        color: "#00ff00",
-        lineWidth: 2
-    });
-
-    /* Draw arm joints */
-    [11,12,13,14,15,16,23,24].forEach(i => {
-        const p = lm[i];
-        ctx.beginPath();
-        ctx.arc(p.x * canvas.width, p.y * canvas.height, 4, 0, Math.PI*2);
-        ctx.fillStyle = "#ff0000";
-        ctx.fill();
-    });
-
-    /* Simplified head (single dot) */
-    const head = lm[0]; // nose
+  [11,12,13,14,15,16,23,24].forEach(i => {
+    const p = lm[i];
     ctx.beginPath();
-    ctx.arc(head.x * canvas.width, head.y * canvas.height, 6, 0, Math.PI*2);
-    ctx.fillStyle = "#00ffff";
+    ctx.arc(p.x * canvas.width, p.y * canvas.height, 4, 0, Math.PI*2);
+    ctx.fillStyle = "#ff0000";
     ctx.fill();
+  });
 
-    /* FPS */
-    const now = performance.now();
-    fps = Math.round(1000 / (now - lastTime));
-    lastTime = now;
+  const head = lm[0];
+  ctx.beginPath();
+  ctx.arc(head.x * canvas.width, head.y * canvas.height, 6, 0, Math.PI*2);
+  ctx.fillStyle = "#00ffff";
+  ctx.fill();
 
-    const hip = lm[23];
+  const now = performance.now();
+  fps = Math.round(1000 / (now - lastTime));
+  lastTime = now;
 
-    debug.textContent =
+  const hip = lm[23];
+
+  debug.textContent =
 `FPS: ${fps}
-Upper-body only
-Scale: ${videoScale.toFixed(2)}
-Offset: ${videoOffsetX}, ${videoOffsetY}
+Mobile Sandbox
+Scale: ${scaleEl.value}
+Offset: ${offsetXEl.value}, ${offsetYEl.value}
 
 HIP:
 x ${hip.x.toFixed(3)}
@@ -190,25 +201,6 @@ y ${hip.y.toFixed(3)}
 z ${hip.z.toFixed(3)}`;
 }
 
-/* ======================
-   KEY CONTROLS
-====================== */
-addEventListener("keydown", e => {
-    switch (e.key) {
-        case "+":
-        case "=": videoScale += 0.05; break;
-        case "-": videoScale -= 0.05; break;
-        case "ArrowLeft": videoOffsetX -= 10; break;
-        case "ArrowRight": videoOffsetX += 10; break;
-        case "ArrowUp": videoOffsetY -= 10; break;
-        case "ArrowDown": videoOffsetY += 10; break;
-    }
-    resize();
-});
-
-/* ======================
-   START
-====================== */
 cam.start();
 </script>
 
