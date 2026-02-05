@@ -2,18 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PrimalTrace Prototype</title>
+<title>PrimalTrace – Sandbox Debug</title>
 <style>
   body {
     margin: 0;
     background: black;
     overflow: hidden;
+    font-family: monospace;
   }
+
   video, canvas {
     position: absolute;
     top: 0;
     left: 0;
-    transform: scaleX(-1); /* mirror for natural movement */
+    transform: scaleX(-1);
+  }
+
+  #debug {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    color: lime;
+    padding: 10px;
+    font-size: 12px;
+    max-width: 340px;
+    z-index: 10;
+  }
+
+  #debug input {
+    width: 100%;
   }
 </style>
 </head>
@@ -21,6 +39,24 @@
 
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
+
+<div id="debug">
+  <div><b>PrimalTrace Sandbox</b></div>
+  <div id="fps">FPS: --</div>
+
+  <label>Video Scale</label>
+  <input type="range" min="0.5" max="2" step="0.01" value="1" id="videoScale">
+
+  <label>Skeleton Scale</label>
+  <input type="range" min="0.5" max="2" step="0.01" value="1.2" id="skeletonScale">
+
+  <label>
+    <input type="checkbox" id="labels" checked>
+    Show Bone Labels
+  </label>
+
+  <pre id="boneData"></pre>
+</div>
 
 <!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
@@ -31,15 +67,31 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-// Initial canvas size
+const fpsEl = document.getElementById("fps");
+const boneDataEl = document.getElementById("boneData");
+const videoScaleEl = document.getElementById("videoScale");
+const skeletonScaleEl = document.getElementById("skeletonScale");
+const labelsEl = document.getElementById("labels");
+
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Optional skeleton scale (tweak if your rig is smaller/larger)
-const skeletonScale = 1.2;
+// FPS tracking
+let lastTime = performance.now();
+let frames = 0;
 
-// Helpers
-function drawDot(x, y, r = 6) {
+function updateFPS() {
+  frames++;
+  const now = performance.now();
+  if (now - lastTime >= 1000) {
+    fpsEl.textContent = `FPS: ${frames}`;
+    frames = 0;
+    lastTime = now;
+  }
+}
+
+// Drawing helpers
+function drawDot(x, y, r = 5) {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
@@ -52,32 +104,28 @@ function drawLine(a, b) {
   ctx.stroke();
 }
 
-function getRotation(a, b) {
+function rotation(a, b) {
   return Math.atan2(b.y - a.y, b.x - a.x);
 }
 
-// MediaPipe setup
+// MediaPipe
 const pose = new Pose({
-  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
 });
 
 pose.setOptions({
   modelComplexity: 1,
-  smoothLandmarks: true,
-  enableSegmentation: false
+  smoothLandmarks: true
 });
 
 pose.onResults(results => {
+  updateFPS();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = "lime";
-  ctx.fillStyle = "red";
-  ctx.lineWidth = 3;
 
   if (!results.poseLandmarks) return;
 
   const lm = results.poseLandmarks;
 
-  // Upper-body joints
   const joints = {
     head: lm[0],
     chest: lm[12],
@@ -89,39 +137,56 @@ pose.onResults(results => {
     rightWrist: lm[16]
   };
 
-  // Scale & map to **displayed video**
   const rect = video.getBoundingClientRect();
+  const skScale = parseFloat(skeletonScaleEl.value);
+
+  const mapped = {};
   for (let k in joints) {
-    joints[k] = {
-      x: rect.left + (joints[k].x * rect.width - rect.left) * skeletonScale,
-      y: rect.top + (joints[k].y * rect.height - rect.top) * skeletonScale
+    mapped[k] = {
+      x: rect.left + joints[k].x * rect.width * skScale,
+      y: rect.top + joints[k].y * rect.height * skScale,
+      z: joints[k].z.toFixed(3)
     };
   }
 
-  // Draw skeleton lines
-  drawLine(joints.leftShoulder, joints.rightShoulder);
-  drawLine(joints.leftShoulder, joints.leftElbow);
-  drawLine(joints.leftElbow, joints.leftWrist);
-  drawLine(joints.rightShoulder, joints.rightElbow);
-  drawLine(joints.rightElbow, joints.rightWrist);
+  ctx.strokeStyle = "lime";
+  ctx.fillStyle = "red";
+  ctx.lineWidth = 2;
 
-  // Draw dots
-  Object.values(joints).forEach(j => drawDot(j.x, j.y));
+  drawLine(mapped.leftShoulder, mapped.rightShoulder);
+  drawLine(mapped.leftShoulder, mapped.leftElbow);
+  drawLine(mapped.leftElbow, mapped.leftWrist);
+  drawLine(mapped.rightShoulder, mapped.rightElbow);
+  drawLine(mapped.rightElbow, mapped.rightWrist);
 
-  // Output rotation data for Unity
-  const data = {
-    leftUpperArmRot: getRotation(joints.leftShoulder, joints.leftElbow),
-    leftLowerArmRot: getRotation(joints.leftElbow, joints.leftWrist),
-    rightUpperArmRot: getRotation(joints.rightShoulder, joints.rightElbow),
-    rightLowerArmRot: getRotation(joints.rightElbow, joints.rightWrist),
-    torsoRot: getRotation(joints.leftShoulder, joints.rightShoulder)
+  Object.entries(mapped).forEach(([name, p]) => {
+    drawDot(p.x, p.y);
+    if (labelsEl.checked) {
+      ctx.fillText(name, p.x + 6, p.y - 6);
+    }
+  });
+
+  // Debug output
+  const debugOut = {};
+  for (let k in mapped) {
+    debugOut[k] = {
+      x: mapped[k].x.toFixed(1),
+      y: mapped[k].y.toFixed(1),
+      z: mapped[k].z
+    };
+  }
+
+  debugOut.rotations = {
+    leftUpper: rotation(mapped.leftShoulder, mapped.leftElbow).toFixed(2),
+    leftLower: rotation(mapped.leftElbow, mapped.leftWrist).toFixed(2),
+    rightUpper: rotation(mapped.rightShoulder, mapped.rightElbow).toFixed(2),
+    rightLower: rotation(mapped.rightElbow, mapped.rightWrist).toFixed(2)
   };
 
-  // Example: log to console (later replace with WebSocket / fetch)
-  console.log(data);
+  boneDataEl.textContent = JSON.stringify(debugOut, null, 2);
 });
 
-// Camera setup
+// Camera
 const camera = new Camera(video, {
   onFrame: async () => await pose.send({ image: video }),
   width: 1280,
@@ -129,12 +194,16 @@ const camera = new Camera(video, {
 });
 camera.start();
 
-// Responsive canvas
-window.addEventListener('resize', () => {
+// Video scaling
+videoScaleEl.addEventListener("input", () => {
+  video.style.transform = `scaleX(-1) scale(${videoScaleEl.value})`;
+});
+
+// Resize handling
+window.addEventListener("resize", () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 });
 </script>
-
 </body>
 </html>
