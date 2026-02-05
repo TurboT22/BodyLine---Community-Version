@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PrimalTrace – Sandbox Debug</title>
+<title>PrimalTrace – Sandbox Debug (Fixed)</title>
 <style>
   body {
     margin: 0;
@@ -11,10 +11,21 @@
     font-family: monospace;
   }
 
-  video, canvas {
+  video {
     position: absolute;
     top: 0;
     left: 0;
+    width: 320px;   /* FORCE size so it always exists */
+    height: 240px;
+    transform: scaleX(-1);
+    z-index: 1;
+  }
+
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
     transform: scaleX(-1);
   }
 
@@ -22,17 +33,15 @@
     position: fixed;
     top: 10px;
     left: 10px;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.75);
     color: lime;
     padding: 10px;
     font-size: 12px;
-    max-width: 340px;
+    width: 340px;
     z-index: 10;
   }
 
-  #debug input {
-    width: 100%;
-  }
+  input { width: 100%; }
 </style>
 </head>
 <body>
@@ -41,24 +50,18 @@
 <canvas id="canvas"></canvas>
 
 <div id="debug">
-  <div><b>PrimalTrace Sandbox</b></div>
-  <div id="fps">FPS: --</div>
+  <b>PrimalTrace Sandbox</b><br>
+  <span id="fps">FPS: --</span><br><br>
 
-  <label>Video Scale</label>
-  <input type="range" min="0.5" max="2" step="0.01" value="1" id="videoScale">
+  Video Scale
+  <input type="range" id="videoScale" min="0.5" max="2" step="0.01" value="1">
 
-  <label>Skeleton Scale</label>
-  <input type="range" min="0.5" max="2" step="0.01" value="1.2" id="skeletonScale">
+  Skeleton Scale
+  <input type="range" id="skeletonScale" min="0.5" max="2" step="0.01" value="1.2">
 
-  <label>
-    <input type="checkbox" id="labels" checked>
-    Show Bone Labels
-  </label>
-
-  <pre id="boneData"></pre>
+  <pre id="boneData">Waiting for camera…</pre>
 </div>
 
-<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
@@ -71,139 +74,94 @@ const fpsEl = document.getElementById("fps");
 const boneDataEl = document.getElementById("boneData");
 const videoScaleEl = document.getElementById("videoScale");
 const skeletonScaleEl = document.getElementById("skeletonScale");
-const labelsEl = document.getElementById("labels");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// FPS tracking
-let lastTime = performance.now();
+// FPS (independent of pose)
+let last = performance.now();
 let frames = 0;
-
-function updateFPS() {
+function fpsTick() {
   frames++;
   const now = performance.now();
-  if (now - lastTime >= 1000) {
-    fpsEl.textContent = `FPS: ${frames}`;
+  if (now - last >= 1000) {
+    fpsEl.textContent = "FPS: " + frames;
     frames = 0;
-    lastTime = now;
+    last = now;
   }
+  requestAnimationFrame(fpsTick);
 }
+fpsTick();
 
-// Drawing helpers
-function drawDot(x, y, r = 5) {
+// Helpers
+function line(a,b){
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.moveTo(a.x,a.y);
+  ctx.lineTo(b.x,b.y);
+  ctx.stroke();
+}
+function dot(p){
+  ctx.beginPath();
+  ctx.arc(p.x,p.y,5,0,Math.PI*2);
   ctx.fill();
 }
 
-function drawLine(a, b) {
-  ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
-  ctx.stroke();
-}
-
-function rotation(a, b) {
-  return Math.atan2(b.y - a.y, b.x - a.x);
-}
-
-// MediaPipe
+// Pose
 const pose = new Pose({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
 });
+pose.setOptions({ smoothLandmarks:true });
 
-pose.setOptions({
-  modelComplexity: 1,
-  smoothLandmarks: true
-});
+pose.onResults(res=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!res.poseLandmarks) return;
 
-pose.onResults(results => {
-  updateFPS();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  if (!results.poseLandmarks) return;
-
-  const lm = results.poseLandmarks;
-
-  const joints = {
-    head: lm[0],
-    chest: lm[12],
-    leftShoulder: lm[11],
-    rightShoulder: lm[12],
-    leftElbow: lm[13],
-    rightElbow: lm[14],
-    leftWrist: lm[15],
-    rightWrist: lm[16]
-  };
-
+  const lm = res.poseLandmarks;
   const rect = video.getBoundingClientRect();
-  const skScale = parseFloat(skeletonScaleEl.value);
+  const s = parseFloat(skeletonScaleEl.value);
 
-  const mapped = {};
-  for (let k in joints) {
-    mapped[k] = {
-      x: rect.left + joints[k].x * rect.width * skScale,
-      y: rect.top + joints[k].y * rect.height * skScale,
-      z: joints[k].z.toFixed(3)
-    };
-  }
-
-  ctx.strokeStyle = "lime";
-  ctx.fillStyle = "red";
-  ctx.lineWidth = 2;
-
-  drawLine(mapped.leftShoulder, mapped.rightShoulder);
-  drawLine(mapped.leftShoulder, mapped.leftElbow);
-  drawLine(mapped.leftElbow, mapped.leftWrist);
-  drawLine(mapped.rightShoulder, mapped.rightElbow);
-  drawLine(mapped.rightElbow, mapped.rightWrist);
-
-  Object.entries(mapped).forEach(([name, p]) => {
-    drawDot(p.x, p.y);
-    if (labelsEl.checked) {
-      ctx.fillText(name, p.x + 6, p.y - 6);
-    }
-  });
-
-  // Debug output
-  const debugOut = {};
-  for (let k in mapped) {
-    debugOut[k] = {
-      x: mapped[k].x.toFixed(1),
-      y: mapped[k].y.toFixed(1),
-      z: mapped[k].z
-    };
-  }
-
-  debugOut.rotations = {
-    leftUpper: rotation(mapped.leftShoulder, mapped.leftElbow).toFixed(2),
-    leftLower: rotation(mapped.leftElbow, mapped.leftWrist).toFixed(2),
-    rightUpper: rotation(mapped.rightShoulder, mapped.rightElbow).toFixed(2),
-    rightLower: rotation(mapped.rightElbow, mapped.rightWrist).toFixed(2)
+  const j = {
+    ls: lm[11], le: lm[13], lw: lm[15],
+    rs: lm[12], re: lm[14], rw: lm[16]
   };
 
-  boneDataEl.textContent = JSON.stringify(debugOut, null, 2);
+  const m = {};
+  for(const k in j){
+    m[k] = {
+      x: rect.left + j[k].x * rect.width * s,
+      y: rect.top  + j[k].y * rect.height * s,
+      z: j[k].z.toFixed(3)
+    };
+  }
+
+  ctx.strokeStyle="lime";
+  ctx.fillStyle="red";
+  line(m.ls,m.le); line(m.le,m.lw);
+  line(m.rs,m.re); line(m.re,m.rw);
+  Object.values(m).forEach(dot);
+
+  boneDataEl.textContent = JSON.stringify(m,null,2);
 });
 
-// Camera
-const camera = new Camera(video, {
-  onFrame: async () => await pose.send({ image: video }),
-  width: 1280,
-  height: 720
-});
-camera.start();
+// Start camera ONLY after metadata loads
+video.onloadedmetadata = () => {
+  const cam = new Camera(video,{
+    onFrame: async()=> await pose.send({image:video}),
+    width:1280,height:720
+  });
+  cam.start();
+};
 
-// Video scaling
-videoScaleEl.addEventListener("input", () => {
+// Safe scaling (preserves mirror)
+videoScaleEl.oninput = ()=>{
   video.style.transform = `scaleX(-1) scale(${videoScaleEl.value})`;
-});
+};
 
-// Resize handling
-window.addEventListener("resize", () => {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-});
+// Resize
+window.onresize = ()=>{
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+};
 </script>
 </body>
 </html>
