@@ -1,145 +1,240 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Sandbox Body Tracking Debug</title>
-<title>Sandbox Upper-Body Tracker</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sandbox Mobile Upper-Body Tracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
 <style>
-@@ -63,7 +63,6 @@
-<canvas id="overlay"></canvas>
-<div id="debug">Loading tracker…</div>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: black;
+  overflow: hidden;
+  font-family: monospace;
+  color: #0f0;
+}
 
-<!-- MediaPipe -->
+#video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  display: none;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#waiting {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: black;
+  color: white;
+  font-size: 18px;
+  z-index: 100;
+}
+
+#debug {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid #0f0;
+  padding: 6px;
+  font-size: 11px;
+  white-space: pre;
+  z-index: 10;
+}
+
+#controls {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.85);
+  padding: 8px;
+  z-index: 20;
+  font-size: 12px;
+}
+
+.control {
+  margin-bottom: 4px;
+}
+
+input[type=number] {
+  width: 80px;
+  background: black;
+  color: #0f0;
+  border: 1px solid #0f0;
+}
+</style>
+</head>
+
+<body>
+
+<div id="waiting">Waiting for camera…</div>
+
+<video id="video" autoplay muted playsinline></video>
+<canvas id="overlay"></canvas>
+
+<div id="debug">Loading…</div>
+
+<div id="controls">
+  <div class="control">Scale:
+    <input id="scale" type="number" step="0.01" value="1.0">
+  </div>
+  <div class="control">Offset X:
+    <input id="offsetX" type="number" step="1" value="0">
+  </div>
+  <div class="control">Offset Y:
+    <input id="offsetY" type="number" step="1" value="0">
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-@@ -103,13 +102,12 @@
-   MEDIAPIPE POSE
-====================== */
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+const waiting = document.getElementById("waiting");
+const debug = document.getElementById("debug");
+
+const scaleEl = document.getElementById("scale");
+const offsetXEl = document.getElementById("offsetX");
+const offsetYEl = document.getElementById("offsetY");
+
+let lastTime = performance.now();
+let fps = 0;
+
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+}
+addEventListener("resize", resize);
+resize();
+
+function applyTransform() {
+  const s = parseFloat(scaleEl.value);
+  const ox = parseFloat(offsetXEl.value);
+  const oy = parseFloat(offsetYEl.value);
+
+  video.style.transform =
+    `translate(${ox}px, ${oy}px) scale(${s}) scaleX(-1)`;
+}
+
+scaleEl.oninput = applyTransform;
+offsetXEl.oninput = applyTransform;
+offsetYEl.oninput = applyTransform;
+
+applyTransform();
+
+/* MediaPipe Pose */
 const pose = new Pose({
-    locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
-    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
 });
 
 pose.setOptions({
-    modelComplexity: 1,
-    smoothLandmarks: true,
-    enableSegmentation: false,
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
-});
-@@ -127,67 +125,92 @@
-    height: 720
+  modelComplexity: 1,
+  smoothLandmarks: true,
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.5
 });
 
-/* ======================
-   CONNECTIONS (NO LEGS)
-====================== */
-const UPPER_CONNECTIONS = [
-    [11,12], // shoulders
-    [11,13],[13,15], // left arm
-    [12,14],[14,16], // right arm
-    [11,23],[12,24]  // torso to hips
+pose.onResults(onResults);
+
+/* Camera */
+const cam = new Camera(video, {
+  onFrame: async () => {
+    await pose.send({ image: video });
+  },
+  width: 720,
+  height: 1280
+});
+
+/* Upper-body connections */
+const CONNECTIONS = [
+  [11,12],
+  [11,13],[13,15],
+  [12,14],[14,16],
+  [11,23],[12,24]
 ];
 
-/* ======================
-   RESULTS
-====================== */
-function onResults(results) {
+function mapPoint(p) {
+  const s = parseFloat(scaleEl.value);
+  const ox = parseFloat(offsetXEl.value);
+  const oy = parseFloat(offsetYEl.value);
+
+  return {
+    x: (p.x * canvas.width * s) + ox,
+    y: (p.y * canvas.height * s) + oy
+  };
+}
+
 function onResults(r) {
-    waiting.style.display = "none";
-    video.style.display = "block";
-    resize();
+  waiting.style.display = "none";
+  video.style.display = "block";
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if (!r.poseLandmarks) return;
 
-    if (results.poseLandmarks) {
-        drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
-            color: "#00ff00",
-            lineWidth: 2
-        });
-        drawLandmarks(ctx, results.poseLandmarks, {
-            color: "#ff0000",
-            radius: 3
-        });
-    }
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+  const lm = r.poseLandmarks;
 
-    if (!r.poseLandmarks) return;
-
-    const lm = r.poseLandmarks;
-
-    /* Draw torso + arms */
-    drawConnectors(ctx, lm, UPPER_CONNECTIONS, {
-        color: "#00ff00",
-        lineWidth: 2
-    });
-
-    /* Draw arm joints */
-    [11,12,13,14,15,16,23,24].forEach(i => {
-        const p = lm[i];
-        ctx.beginPath();
-        ctx.arc(p.x * canvas.width, p.y * canvas.height, 4, 0, Math.PI*2);
-        ctx.fillStyle = "#ff0000";
-        ctx.fill();
-    });
-
-    /* Simplified head (single dot) */
-    const head = lm[0]; // nose
+  /* Draw bones */
+  ctx.strokeStyle = "#00ff00";
+  ctx.lineWidth = 2;
+  CONNECTIONS.forEach(([a,b]) => {
+    const p1 = mapPoint(lm[a]);
+    const p2 = mapPoint(lm[b]);
     ctx.beginPath();
-    ctx.arc(head.x * canvas.width, head.y * canvas.height, 6, 0, Math.PI*2);
-    ctx.fillStyle = "#00ffff";
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  });
+
+  /* Draw joints */
+  ctx.fillStyle = "#ff0000";
+  [11,12,13,14,15,16,23,24].forEach(i => {
+    const p = mapPoint(lm[i]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
     ctx.fill();
+  });
 
-    /* FPS */
-    const now = performance.now();
-    fps = Math.round(1000 / (now - lastTime));
-    lastTime = now;
+  /* Simplified head */
+  const head = mapPoint(lm[0]);
+  ctx.fillStyle = "#00ffff";
+  ctx.beginPath();
+  ctx.arc(head.x, head.y, 6, 0, Math.PI*2);
+  ctx.fill();
 
-    if (results.poseLandmarks) {
-        const hip = results.poseLandmarks[23];
-        debug.textContent =
-    const hip = lm[23];
+  /* FPS */
+  const now = performance.now();
+  fps = Math.round(1000 / (now - lastTime));
+  lastTime = now;
 
-    debug.textContent =
+  const hip = lm[23];
+
+  debug.textContent =
 `FPS: ${fps}
-Video Scale: ${videoScale.toFixed(2)}
-Offset X: ${videoOffsetX}
-Offset Y: ${videoOffsetY}
-Upper-body only
-Scale: ${videoScale.toFixed(2)}
-Offset: ${videoOffsetX}, ${videoOffsetY}
+Upper-body only (mobile)
+Scale: ${scaleEl.value}
+Offset: ${offsetXEl.value}, ${offsetYEl.value}
 
 HIP:
-x: ${hip.x.toFixed(3)}
-y: ${hip.y.toFixed(3)}
-z: ${hip.z.toFixed(3)}`;
-    }
 x ${hip.x.toFixed(3)}
 y ${hip.y.toFixed(3)}
 z ${hip.z.toFixed(3)}`;
 }
 
-/* ======================
-   KEY CONTROLS
-====================== */
-addEventListener("keydown", e => {
-    switch (e.key) {
-        case "+":
-        case "=": videoScale += 0.05; break;
-        case "-": videoScale -= 0.05; break;
-        case "ArrowLeft": videoOffsetX -= 10; break;
-        case "ArrowRight": videoOffsetX += 10; break;
-        case "ArrowUp": videoOffsetY -= 10; break;
-        case "ArrowDown": videoOffsetY += 10; break;
-    }
-    resize();
-});
-
-/* ======================
-   START
-====================== */
 cam.start();
 </script>
 
