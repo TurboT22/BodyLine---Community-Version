@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PrimalTrace – Sandbox Debug (Fixed)</title>
+<title>PrimalTrace – Sandbox Debug</title>
 <style>
   body {
     margin: 0;
@@ -15,9 +15,8 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: 320px;   /* FORCE size so it always exists */
+    width: 320px;
     height: 240px;
-    transform: scaleX(-1);
     z-index: 1;
   }
 
@@ -26,7 +25,7 @@
     top: 0;
     left: 0;
     z-index: 2;
-    transform: scaleX(-1);
+    pointer-events: none;
   }
 
   #debug {
@@ -37,11 +36,13 @@
     color: lime;
     padding: 10px;
     font-size: 12px;
-    width: 340px;
+    width: 360px;
     z-index: 10;
   }
 
-  input { width: 100%; }
+  #debug input {
+    width: 100%;
+  }
 </style>
 </head>
 <body>
@@ -51,10 +52,16 @@
 
 <div id="debug">
   <b>PrimalTrace Sandbox</b><br>
-  <span id="fps">FPS: --</span><br><br>
+  <div id="fps">FPS: --</div><br>
 
   Video Scale
   <input type="range" id="videoScale" min="0.5" max="2" step="0.01" value="1">
+
+  Video Offset X
+  <input type="range" id="videoOffsetX" min="-500" max="500" step="1" value="0">
+
+  Video Offset Y
+  <input type="range" id="videoOffsetY" min="-500" max="500" step="1" value="0">
 
   Skeleton Scale
   <input type="range" id="skeletonScale" min="0.5" max="2" step="0.01" value="1.2">
@@ -66,22 +73,27 @@
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
+/* ===== DOM ===== */
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 const fpsEl = document.getElementById("fps");
 const boneDataEl = document.getElementById("boneData");
+
 const videoScaleEl = document.getElementById("videoScale");
+const videoOffsetXEl = document.getElementById("videoOffsetX");
+const videoOffsetYEl = document.getElementById("videoOffsetY");
 const skeletonScaleEl = document.getElementById("skeletonScale");
 
+/* ===== CANVAS ===== */
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// FPS (independent of pose)
+/* ===== FPS ===== */
 let last = performance.now();
 let frames = 0;
-function fpsTick() {
+function fpsLoop() {
   frames++;
   const now = performance.now();
   if (now - last >= 1000) {
@@ -89,36 +101,53 @@ function fpsTick() {
     frames = 0;
     last = now;
   }
-  requestAnimationFrame(fpsTick);
+  requestAnimationFrame(fpsLoop);
 }
-fpsTick();
+fpsLoop();
 
-// Helpers
-function line(a,b){
+/* ===== DRAW HELPERS ===== */
+function line(a,b) {
   ctx.beginPath();
   ctx.moveTo(a.x,a.y);
   ctx.lineTo(b.x,b.y);
   ctx.stroke();
 }
-function dot(p){
+function dot(p) {
   ctx.beginPath();
   ctx.arc(p.x,p.y,5,0,Math.PI*2);
   ctx.fill();
 }
 
-// Pose
+/* ===== VIDEO TRANSFORM ===== */
+function updateVideoTransform() {
+  const s = parseFloat(videoScaleEl.value);
+  const ox = parseFloat(videoOffsetXEl.value);
+  const oy = parseFloat(videoOffsetYEl.value);
+
+  video.style.transform =
+    `translate(${ox}px, ${oy}px) scaleX(-1) scale(${s})`;
+}
+
+videoScaleEl.oninput = updateVideoTransform;
+videoOffsetXEl.oninput = updateVideoTransform;
+videoOffsetYEl.oninput = updateVideoTransform;
+updateVideoTransform();
+
+/* ===== POSE ===== */
 const pose = new Pose({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
 });
-pose.setOptions({ smoothLandmarks:true });
+pose.setOptions({ smoothLandmarks: true });
 
-pose.onResults(res=>{
+pose.onResults(res => {
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(!res.poseLandmarks) return;
+  if (!res.poseLandmarks) return;
 
   const lm = res.poseLandmarks;
   const rect = video.getBoundingClientRect();
   const s = parseFloat(skeletonScaleEl.value);
+  const ox = parseFloat(videoOffsetXEl.value);
+  const oy = parseFloat(videoOffsetYEl.value);
 
   const j = {
     ls: lm[11], le: lm[13], lw: lm[15],
@@ -126,42 +155,41 @@ pose.onResults(res=>{
   };
 
   const m = {};
-  for(const k in j){
+  for (const k in j) {
     m[k] = {
-      x: rect.left + j[k].x * rect.width * s,
-      y: rect.top  + j[k].y * rect.height * s,
+      x: rect.left + ox + j[k].x * rect.width * s,
+      y: rect.top  + oy + j[k].y * rect.height * s,
       z: j[k].z.toFixed(3)
     };
   }
 
-  ctx.strokeStyle="lime";
-  ctx.fillStyle="red";
+  ctx.strokeStyle = "lime";
+  ctx.fillStyle = "red";
+  ctx.lineWidth = 2;
+
   line(m.ls,m.le); line(m.le,m.lw);
   line(m.rs,m.re); line(m.re,m.rw);
   Object.values(m).forEach(dot);
 
-  boneDataEl.textContent = JSON.stringify(m,null,2);
+  boneDataEl.textContent = JSON.stringify(m, null, 2);
 });
 
-// Start camera ONLY after metadata loads
+/* ===== CAMERA START ===== */
 video.onloadedmetadata = () => {
-  const cam = new Camera(video,{
-    onFrame: async()=> await pose.send({image:video}),
-    width:1280,height:720
+  const cam = new Camera(video, {
+    onFrame: async () => await pose.send({ image: video }),
+    width: 1280,
+    height: 720
   });
   cam.start();
 };
 
-// Safe scaling (preserves mirror)
-videoScaleEl.oninput = ()=>{
-  video.style.transform = `scaleX(-1) scale(${videoScaleEl.value})`;
-};
-
-// Resize
-window.onresize = ()=>{
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
+/* ===== RESIZE ===== */
+window.onresize = () => {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 };
 </script>
+
 </body>
 </html>
