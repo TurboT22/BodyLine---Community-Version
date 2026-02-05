@@ -2,193 +2,220 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PrimalTrace – Sandbox Debug</title>
+<title>Sandbox Body Tracking Debug</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-  body {
-    margin: 0;
-    background: black;
-    overflow: hidden;
-    font-family: monospace;
-  }
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        overflow: hidden;
+        font-family: monospace;
+        color: #0f0;
+    }
 
-  video {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 320px;
-    height: 240px;
-    z-index: 1;
-  }
+    #container {
+        position: fixed;
+        inset: 0;
+    }
 
-  canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 2;
-    pointer-events: none;
-  }
+    #video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform-origin: top left;
+        display: none;
+    }
 
-  #debug {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    background: rgba(0,0,0,0.75);
-    color: lime;
-    padding: 10px;
-    font-size: 12px;
-    width: 360px;
-    z-index: 10;
-  }
+    #overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+    }
 
-  #debug input {
-    width: 100%;
-  }
+    #debug {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        background: rgba(0,0,0,0.7);
+        padding: 8px;
+        border: 1px solid #0f0;
+        font-size: 12px;
+        z-index: 999;
+        white-space: pre;
+    }
+
+    #waiting {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 20px;
+        background: black;
+        z-index: 1000;
+    }
 </style>
 </head>
+
 <body>
 
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas"></canvas>
+<div id="waiting">Waiting for camera permission…</div>
 
-<div id="debug">
-  <b>PrimalTrace Sandbox</b><br>
-  <div id="fps">FPS: --</div><br>
-
-  Video Scale
-  <input type="range" id="videoScale" min="0.5" max="2" step="0.01" value="1">
-
-  Video Offset X
-  <input type="range" id="videoOffsetX" min="-500" max="500" step="1" value="0">
-
-  Video Offset Y
-  <input type="range" id="videoOffsetY" min="-500" max="500" step="1" value="0">
-
-  Skeleton Scale
-  <input type="range" id="skeletonScale" min="0.5" max="2" step="0.01" value="1.2">
-
-  <pre id="boneData">Waiting for camera…</pre>
+<div id="container">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay"></canvas>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<div id="debug">Initializing…</div>
 
 <script>
-/* ===== DOM ===== */
 const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
+const canvas = document.getElementById("overlay");
 const ctx = canvas.getContext("2d");
+const debug = document.getElementById("debug");
+const waiting = document.getElementById("waiting");
 
-const fpsEl = document.getElementById("fps");
-const boneDataEl = document.getElementById("boneData");
+/* ======================
+   DEBUG SETTINGS (AUTO)
+====================== */
+let debugMode = true;
 
-const videoScaleEl = document.getElementById("videoScale");
-const videoOffsetXEl = document.getElementById("videoOffsetX");
-const videoOffsetYEl = document.getElementById("videoOffsetY");
-const skeletonScaleEl = document.getElementById("skeletonScale");
+// Video transform controls
+let videoScale = 1.4;
+let videoOffsetX = -200;
+let videoOffsetY = 0;
 
-/* ===== CANVAS ===== */
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+// FPS
+let lastTime = performance.now();
+let fps = 0;
 
-/* ===== FPS ===== */
-let last = performance.now();
-let frames = 0;
-function fpsLoop() {
-  frames++;
-  const now = performance.now();
-  if (now - last >= 1000) {
-    fpsEl.textContent = "FPS: " + frames;
-    frames = 0;
-    last = now;
-  }
-  requestAnimationFrame(fpsLoop);
-}
-fpsLoop();
+/* ======================
+   CAMERA SETUP
+====================== */
+async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: "user"
+            },
+            audio: false
+        });
 
-/* ===== DRAW HELPERS ===== */
-function line(a,b) {
-  ctx.beginPath();
-  ctx.moveTo(a.x,a.y);
-  ctx.lineTo(b.x,b.y);
-  ctx.stroke();
-}
-function dot(p) {
-  ctx.beginPath();
-  ctx.arc(p.x,p.y,5,0,Math.PI*2);
-  ctx.fill();
-}
+        video.srcObject = stream;
 
-/* ===== VIDEO TRANSFORM ===== */
-function updateVideoTransform() {
-  const s = parseFloat(videoScaleEl.value);
-  const ox = parseFloat(videoOffsetXEl.value);
-  const oy = parseFloat(videoOffsetYEl.value);
+        video.onloadedmetadata = () => {
+            video.play();
+            video.style.display = "block";
+            waiting.style.display = "none";
+            resize();
+            requestAnimationFrame(loop);
+        };
 
-  video.style.transform =
-    `translate(${ox}px, ${oy}px) scaleX(-1) scale(${s})`;
+    } catch (err) {
+        waiting.innerText = "Camera blocked or unavailable";
+        console.error(err);
+    }
 }
 
-videoScaleEl.oninput = updateVideoTransform;
-videoOffsetXEl.oninput = updateVideoTransform;
-videoOffsetYEl.oninput = updateVideoTransform;
-updateVideoTransform();
+/* ======================
+   RESIZE HANDLING
+====================== */
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-/* ===== POSE ===== */
-const pose = new Pose({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`
+    video.style.transform =
+        `translate(${videoOffsetX}px, ${videoOffsetY}px) scale(${videoScale})`;
+}
+
+window.addEventListener("resize", resize);
+
+/* ======================
+   MAIN LOOP
+====================== */
+function loop(now) {
+    const delta = now - lastTime;
+    fps = Math.round(1000 / delta);
+    lastTime = now;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Example skeleton placeholder (replace with real data)
+    drawDebugSkeleton();
+
+    if (debugMode) {
+        debug.textContent =
+`FPS: ${fps}
+Video Scale: ${videoScale.toFixed(2)}
+Offset X: ${videoOffsetX}
+Offset Y: ${videoOffsetY}
+Canvas: ${canvas.width}x${canvas.height}
+Video: ${video.videoWidth}x${video.videoHeight}`;
+    }
+
+    requestAnimationFrame(loop);
+}
+
+/* ======================
+   DEBUG SKELETON (TEST)
+====================== */
+function drawDebugSkeleton() {
+    ctx.strokeStyle = "#00ff00";
+    ctx.lineWidth = 2;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy - 100, 10, 0, Math.PI * 2); // head
+    ctx.moveTo(cx, cy - 90);
+    ctx.lineTo(cx, cy + 50); // spine
+    ctx.moveTo(cx - 50, cy);
+    ctx.lineTo(cx + 50, cy); // arms
+    ctx.moveTo(cx, cy + 50);
+    ctx.lineTo(cx - 30, cy + 120); // leg
+    ctx.moveTo(cx, cy + 50);
+    ctx.lineTo(cx + 30, cy + 120); // leg
+    ctx.stroke();
+}
+
+/* ======================
+   KEYBOARD CONTROLS
+====================== */
+window.addEventListener("keydown", e => {
+    switch (e.key) {
+        case "+":
+        case "=":
+            videoScale += 0.05;
+            break;
+        case "-":
+            videoScale -= 0.05;
+            break;
+        case "ArrowLeft":
+            videoOffsetX -= 10;
+            break;
+        case "ArrowRight":
+            videoOffsetX += 10;
+            break;
+        case "ArrowUp":
+            videoOffsetY -= 10;
+            break;
+        case "ArrowDown":
+            videoOffsetY += 10;
+            break;
+    }
+    resize();
 });
-pose.setOptions({ smoothLandmarks: true });
 
-pose.onResults(res => {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  if (!res.poseLandmarks) return;
-
-  const lm = res.poseLandmarks;
-  const rect = video.getBoundingClientRect();
-  const s = parseFloat(skeletonScaleEl.value);
-  const ox = parseFloat(videoOffsetXEl.value);
-  const oy = parseFloat(videoOffsetYEl.value);
-
-  const j = {
-    ls: lm[11], le: lm[13], lw: lm[15],
-    rs: lm[12], re: lm[14], rw: lm[16]
-  };
-
-  const m = {};
-  for (const k in j) {
-    m[k] = {
-      x: rect.left + ox + j[k].x * rect.width * s,
-      y: rect.top  + oy + j[k].y * rect.height * s,
-      z: j[k].z.toFixed(3)
-    };
-  }
-
-  ctx.strokeStyle = "lime";
-  ctx.fillStyle = "red";
-  ctx.lineWidth = 2;
-
-  line(m.ls,m.le); line(m.le,m.lw);
-  line(m.rs,m.re); line(m.re,m.rw);
-  Object.values(m).forEach(dot);
-
-  boneDataEl.textContent = JSON.stringify(m, null, 2);
-});
-
-/* ===== CAMERA START ===== */
-video.onloadedmetadata = () => {
-  const cam = new Camera(video, {
-    onFrame: async () => await pose.send({ image: video }),
-    width: 1280,
-    height: 720
-  });
-  cam.start();
-};
-
-/* ===== RESIZE ===== */
-window.onresize = () => {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-};
+/* ======================
+   START
+====================== */
+startCamera();
 </script>
 
 </body>
