@@ -3,123 +3,64 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Upper-Body Tracking — Buttery UI → Unity</title>
+  <title>MediaPipe Upper-Body Demo — Focused Tracker</title>
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-
   <style>
     :root{
-      --bg1: linear-gradient(135deg,#0f1724 0%, #071129 60%, #071326 100%);
-      --card: rgba(255,255,255,0.04);
-      --glass: rgba(255,255,255,0.06);
-      --accent: #7afcff;
-      --accent-2: #7ad97a;
-      --muted: #9aa7b2;
-      --success: #2ee6a6;
-      --danger: #ff6b6b;
-      --glass-blur: 12px;
-      color-scheme: dark;
+      --bg: #071024;
+      --card: rgba(255,255,255,0.03);
+      --muted: #9fb0bd;
+      --accent: #72f0d8;
     }
-
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#e6f0f2;background:var(--bg1);}
-    .wrap{max-width:1200px;margin:36px auto;padding:24px;}
-    header{display:flex;align-items:center;gap:18px;margin-bottom:18px}
-    header h1{font-size:1.5rem;margin:0;font-weight:600;letter-spacing:-0.2px}
-    header p{margin:0;color:var(--muted);font-size:0.95rem}
-
-    .layout{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start}
-    /* Video card */
-    .card{
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-      border-radius:14px;
-      padding:14px;
-      box-shadow: 0 6px 30px rgba(2,8,23,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
-      border: 1px solid rgba(255,255,255,0.03);
-      backdrop-filter: blur(var(--glass-blur));
-    }
-
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#e6f7f5;background:linear-gradient(180deg,#04101a,#071629);}
+    .wrap{max-width:1100px;margin:28px auto;padding:20px;}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+    header h1{margin:0;font-size:1.25rem}
+    .layout{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+    .card{background:var(--card);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.02);backdrop-filter: blur(8px);box-shadow:0 8px 30px rgba(2,8,20,0.6)}
     .video-wrap{position:relative;border-radius:10px;overflow:hidden}
     video{display:block;width:100%;height:auto;background:#000;transform:scaleX(-1)}
     canvas.overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;transform:scaleX(-1)}
-    .video-footer{display:flex;justify-content:space-between;align-items:center;padding:10px 6px 0 6px}
-    .chip{background:var(--glass);padding:6px 10px;border-radius:999px;color:var(--muted);font-size:0.85rem;border:1px solid rgba(255,255,255,0.03)}
-    .small{font-size:0.85rem;color:var(--muted)}
-
-    /* Controls column */
-    .controls{display:flex;flex-direction:column;gap:12px}
-    label{font-size:0.85rem;color:var(--muted);display:block;margin-bottom:6px}
-    select,input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:0;background:rgba(255,255,255,0.02);color:#e6f0f2;outline:none}
-    input[type=range]{width:100%}
-    .row{display:flex;gap:10px}
-    .status-bubble{display:inline-flex;align-items:center;gap:8px;padding:10px;border-radius:10px;background:linear-gradient(90deg, rgba(0,0,0,0.25), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03)}
-    .dot{width:10px;height:10px;border-radius:50%}
-    .dot.green{background:var(--success);box-shadow:0 4px 12px rgba(46,230,166,0.18)}
-    .dot.yellow{background:#ffd166;box-shadow:0 4px 12px rgba(255,209,102,0.14)}
-    .dot.red{background:var(--danger);box-shadow:0 4px 12px rgba(255,107,107,0.12)}
-    .connect-btn{
-      margin-top:6px;padding:10px 14px;border-radius:12px;border:0;background:linear-gradient(90deg,var(--accent),#6ef0a9);color:#012;cursor:pointer;font-weight:600;box-shadow:0 8px 30px rgba(122,217,122,0.08);transition:transform .14s ease,box-shadow .14s ease;
-    }
-    .connect-btn:active{transform:translateY(1px)}
-    .connect-btn.warn{background:linear-gradient(90deg,#ffd166,#ffb6b6);color:#2b0a00}
-
-    .mini{font-size:0.82rem;color:var(--muted)}
-    .json-box{font-family:SFMono-Regular,Menlo,monospace;background:rgba(0,0,0,0.24);padding:10px;border-radius:8px;max-height:160px;overflow:auto;color:#cbeef0;border:1px solid rgba(255,255,255,0.02)}
-
-    footer{margin-top:16px;color:var(--muted);font-size:0.85rem}
-    .footer-row{display:flex;gap:12px;align-items:center}
-
-    /* subtle animations */
-    .pulse{animation:pulse 2s infinite}
-    @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.02)}100%{transform:scale(1)}}
-
-    /* responsive */
-    @media (max-width:980px){
-      .layout{grid-template-columns:1fr; }
-      .controls{order:2}
-    }
+    .controls{display:flex;flex-direction:column;gap:10px}
+    label{display:block;font-size:0.85rem;color:var(--muted);margin-bottom:6px}
+    select,input[type=text]{width:100%;padding:8px 10px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:#eaf7f6}
+    button{padding:8px 12px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--accent),#8ee1a9);color:#012;font-weight:700;cursor:pointer}
+    .row{display:flex;gap:8px}
+    .stats{display:flex;gap:12px;align-items:center;color:var(--muted);font-size:0.9rem}
+    .json-box{font-family:SFMono-Regular,Menlo,monospace;background:rgba(0,0,0,0.18);padding:8px;border-radius:8px;max-height:240px;overflow:auto;color:#cbeef0;border:1px solid rgba(255,255,255,0.02)}
+    footer{margin-top:12px;color:var(--muted);font-size:0.85rem}
+    @media (max-width:980px){ .layout{grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <div>
-        <h1>Upper-Body Tracking — Buttery UI</h1>
-        <p>MediaPipe Pose in-browser → streams landmark frames to Unity. Auto camera selection, server scan, and a clean polished UI.</p>
+        <h1>MediaPipe Upper-Body Demo — Tracker Only</h1>
+        <div style="color:var(--muted);font-size:0.95rem">No network/WebSocket — just camera + MediaPipe pose visualization and compact JSON preview.</div>
+      </div>
+      <div class="stats">
+        <div>FPS: <strong id="fps">0</strong></div>
+        <div>Frames: <strong id="frames">0</strong></div>
       </div>
     </header>
 
     <div class="layout">
-      <!-- Video & overlay -->
-      <div class="card video-card">
+      <!-- video -->
+      <div class="card">
         <div class="video-wrap" id="videoCard">
           <video id="input_video" autoplay playsinline muted></video>
           <canvas id="output_canvas" class="overlay"></canvas>
         </div>
 
-        <div class="video-footer">
-          <div style="display:flex;flex-direction:column">
-            <div class="chip" id="cameraLabel">Camera: —</div>
-            <div class="small" id="cameraRes">Resolution: —</div>
-          </div>
-
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-            <div class="status-bubble">
-              <div id="connDot" class="dot red"></div>
-              <div style="display:flex;flex-direction:column">
-                <div id="connStatus" style="font-weight:600">Disconnected</div>
-                <div class="mini" id="serverUrl">ws://localhost:8765/pose</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <div class="mini">FPS: <strong id="fps">0</strong></div>
-              <div class="mini">Sent: <strong id="sentCount">0</strong></div>
-              <div class="mini">Last: <strong id="lastSentTime">—</strong></div>
-            </div>
-          </div>
+        <div style="display:flex;justify-content:space-between;margin-top:10px;align-items:center">
+          <div style="color:var(--muted);font-size:0.9rem" id="cameraInfo">Camera: —</div>
+          <div style="color:var(--muted);font-size:0.9rem" id="resInfo">Resolution: —</div>
         </div>
       </div>
 
-      <!-- Controls -->
+      <!-- controls -->
       <div class="controls">
         <div class="card">
           <label>Camera</label>
@@ -131,251 +72,68 @@
               <option value="640x480">640 × 480</option>
               <option value="320x240">320 × 240</option>
             </select>
-            <button id="restartCam" class="connect-btn" style="padding:8px 10px">Start</button>
+            <button id="startBtn">Start</button>
+            <button id="stopBtn" style="background:linear-gradient(90deg,#ff9a9a,#ffbdbd);color:#300">Stop</button>
           </div>
 
-          <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0">
+          <hr style="margin:12px 0;border:none;height:1px;background:rgba(255,255,255,0.03)">
 
-          <label>WebSocket</label>
-          <input id="wsUrl" type="text" placeholder="ws://localhost:8765/pose" />
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button id="connectBtn" class="connect-btn">Connect</button>
-            <button id="scanBtn" class="connect-btn warn">Auto-Scan Local</button>
-          </div>
-
-          <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-            <label style="margin:0">Send throttle (ms)</label>
-            <input id="throttle" type="range" min="16" max="250" value="33" />
+          <label>Options</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="margin:0">Smoothing</label>
+            <input id="smoothToggle" type="checkbox" checked />
           </div>
 
           <div style="margin-top:12px">
-            <label>Preview / Sent JSON</label>
-            <div class="json-box" id="jsonOut">No frames yet.</div>
+            <label>Compact last frame (preview)</label>
+            <div class="json-box" id="jsonOut">No frames processed yet.</div>
           </div>
         </div>
 
         <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <div style="font-weight:600">Status</div>
-              <div class="mini" id="detailStatus">Initializing...</div>
-            </div>
-            <div style="text-align:right">
-              <div style="font-weight:700;color:var(--accent)">Local-first</div>
-              <div class="mini">No extra setup required</div>
-            </div>
-          </div>
-
-          <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0">
-
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div>
-              <label>Last raw frame (compact)</label>
-              <div class="json-box" id="compactOut" style="max-height:96px">—</div>
-            </div>
-
-            <div>
-              <label>Tips</label>
-              <div class="mini">Allow camera access to get device names. Press "Auto-Scan Local" to try common local ports where Unity may be listening (8765, 8080, 3000, 8000, 9000).</div>
-            </div>
-          </div>
+          <div style="font-weight:700">Debug / Tips</div>
+          <ul style="color:var(--muted)">
+            <li>Allow camera access when the browser prompts. Device labels require permission.</li>
+            <li>If the feed pauses, press Stop then Start. This page uses requestVideoFrameCallback (fast) with a safe fallback.</li>
+            <li>This demo keeps all processing on the main thread for simplicity — you can move heavy logic to a worker if needed.</li>
+          </ul>
         </div>
-
       </div>
     </div>
 
-    <footer>
-      <div class="footer-row">
-        <div class="mini">Built with MediaPipe Pose • Streams normalized x/y/z landmarks</div>
-      </div>
-    </footer>
+    <footer>Built with MediaPipe Pose. Shows selected upper-body landmarks and a compact JSON output for debugging.</footer>
   </div>
 
-  <!-- MediaPipe libs -->
+  <!-- MediaPipe -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.4/drawing_utils.js"></script>
 
   <script>
-  // --- UI elements
+  // UI elements
   const videoEl = document.getElementById('input_video');
   const canvasEl = document.getElementById('output_canvas');
   const ctx = canvasEl.getContext('2d');
-
   const cameraSelect = document.getElementById('cameraSelect');
   const resSelect = document.getElementById('resSelect');
-  const restartCamBtn = document.getElementById('restartCam');
-
-  const wsUrlEl = document.getElementById('wsUrl');
-  const connectBtn = document.getElementById('connectBtn');
-  const scanBtn = document.getElementById('scanBtn');
-
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
   const jsonOut = document.getElementById('jsonOut');
-  const compactOut = document.getElementById('compactOut');
-
-  const cameraLabel = document.getElementById('cameraLabel');
-  const cameraRes = document.getElementById('cameraRes');
-  const connDot = document.getElementById('connDot');
-  const connStatus = document.getElementById('connStatus');
-  const serverUrl = document.getElementById('serverUrl');
-
+  const cameraInfo = document.getElementById('cameraInfo');
+  const resInfo = document.getElementById('resInfo');
   const fpsEl = document.getElementById('fps');
-  const sentCountEl = document.getElementById('sentCount');
-  const lastSentTimeEl = document.getElementById('lastSentTime');
-  const detailStatus = document.getElementById('detailStatus');
+  const framesEl = document.getElementById('frames');
+  const smoothToggle = document.getElementById('smoothToggle');
 
-  const throttleEl = document.getElementById('throttle');
-
-  // --- state
-  let ws = null;
-  let lastSend = 0;
-  let sendThrottleMs = Number(throttleEl.value || 33);
-  let sentCount = 0;
-  let lastFrameCompact = null;
+  // state
   let stream = null;
-  let poseProcessorRunning = false;
-  let fpsCounter = { lastTime: performance.now(), frames: 0, fps: 0 };
+  let running = false;
+  let frameCount = 0;
+  let lastFrameTime = performance.now();
+  let fpsCounter = {last: performance.now(), frames:0, fps:0};
+  let rvID = null; // requestVideoFrameCallback id (we store callback reference)
+  let intervalId = null;
 
-  throttleEl.addEventListener('input', () => sendThrottleMs = Number(throttleEl.value));
-
-  // default server suggestion
-  const DEFAULT_PATH = "/pose";
-  wsUrlEl.value = `ws://localhost:8765${DEFAULT_PATH}`;
-  serverUrl.innerText = wsUrlEl.value;
-
-  // --- basic helpers
-  function setConnStatus(stateText, colorClass){
-    connStatus.innerText = stateText;
-    connDot.className = 'dot ' + colorClass;
-    serverUrl.innerText = wsUrlEl.value;
-  }
-  function updateDetail(text){ detailStatus.innerText = text; }
-
-  // --- MediaPipe Pose setup
-  const pose = new Pose({
-    locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`
-  });
-  pose.setOptions({
-    modelComplexity: 1,
-    smoothLandmarks: true,
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
-  });
-  pose.onResults(onResults);
-
-  // --- Enumerate cameras (need permission to see labels)
-  async function enumerateCameras() {
-    try {
-      // get permission if needed
-      if (!stream) {
-        const s = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
-        s.getTracks().forEach(t => t.stop());
-      }
-    } catch (e) {
-      // ignore permission denied for now
-    }
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoInputs = devices.filter(d => d.kind === 'videoinput');
-    cameraSelect.innerHTML = '';
-    videoInputs.forEach((d, i) => {
-      const opt = document.createElement('option');
-      opt.value = d.deviceId;
-      opt.innerText = d.label || `Camera ${i+1}`;
-      cameraSelect.appendChild(opt);
-    });
-    if (videoInputs.length === 0){
-      cameraSelect.innerHTML = '<option value="">No camera found</option>';
-    }
-  }
-
-  // --- Start camera with deviceId and resolution
-  async function startCamera(deviceId, width=1280, height=720) {
-    stopCamera();
-    updateDetail('Starting camera...');
-    const constraints = {
-      video: {
-        width: { ideal: width },
-        height: { ideal: height },
-        deviceId: deviceId ? { exact: deviceId } : undefined
-      },
-      audio: false
-    };
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      videoEl.srcObject = stream;
-      await videoEl.play();
-      cameraLabel.innerText = `Camera: ${cameraSelect.selectedOptions[0]?.text || 'Camera'}`;
-      cameraRes.innerText = `Resolution: ${videoEl.videoWidth} × ${videoEl.videoHeight}`;
-      canvasEl.width = videoEl.videoWidth;
-      canvasEl.height = videoEl.videoHeight;
-      updateDetail('Camera running');
-      // begin processing frames loop
-      poseProcessorRunning = true;
-      requestAnimationFrame(processLoop);
-    } catch (e) {
-      updateDetail('Camera start failed: ' + (e.message || e));
-      console.error(e);
-    }
-  }
-
-  function stopCamera(){
-    poseProcessorRunning = false;
-    if (stream){
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    videoEl.pause();
-    videoEl.srcObject = null;
-  }
-
-  restartCamBtn.addEventListener('click', async () => {
-    const devId = cameraSelect.value || null;
-    const [w,h] = (resSelect.value || '1280x720').split('x').map(Number);
-    await startCamera(devId, w, h);
-  });
-
-  // Try to auto-start on page open
-  window.addEventListener('load', async () => {
-    await enumerateCameras();
-    // if at least one camera, start with first
-    if (cameraSelect.options.length > 0) {
-      cameraSelect.selectedIndex = 0;
-      const [w,h] = (resSelect.value || '1280x720').split('x').map(Number);
-      await startCamera(cameraSelect.value, w, h);
-    }
-    // attempt to auto-connect if local
-    if (wsUrlEl.value.includes('localhost') || wsUrlEl.value.includes('127.0.0.1')) {
-      tryAutoConnectDefault();
-    }
-  });
-
-  // camera selection change
-  cameraSelect.addEventListener('change', () => {
-    // nothing until Start pressed
-  });
-
-  // --- Process loop (sends frames to MediaPipe)
-  async function processLoop() {
-    if (!poseProcessorRunning) return;
-    if (videoEl.readyState >= 2) {
-      try {
-        await pose.send({image: videoEl});
-      } catch (e) {
-        // ignore occasional send errors
-      }
-    }
-    // FPS counter
-    fpsCounter.frames++;
-    const now = performance.now();
-    if (now - fpsCounter.lastTime >= 1000) {
-      fpsCounter.fps = Math.round((fpsCounter.frames * 1000) / (now - fpsCounter.lastTime));
-      fpsCounter.lastTime = now;
-      fpsCounter.frames = 0;
-      fpsEl.innerText = fpsCounter.fps;
-    }
-    requestAnimationFrame(processLoop);
-  }
-
-  // --- Build compact landmarks and send via WebSocket
+  // Upper landmarks we care about
   const UPPER_INDICES = {
     "nose": 0,
     "left_shoulder": 11,
@@ -388,37 +146,34 @@
     "right_hip": 24
   };
 
-  function buildLandmarkObjects(poseLandmarks){
-    if (!poseLandmarks) return [];
-    const out = [];
-    for (const [name, idx] of Object.entries(UPPER_INDICES)) {
-      const lm = poseLandmarks[idx];
-      if (!lm) continue;
-      out.push({
-        name, index: idx,
-        x: Number(lm.x.toFixed(6)),
-        y: Number(lm.y.toFixed(6)),
-        z: Number(lm.z.toFixed(6)),
-        visibility: lm.visibility !== undefined ? Number(lm.visibility.toFixed(3)) : 1.0
-      });
-    }
-    return out;
-  }
+  // Setup MediaPipe Pose
+  const pose = new Pose({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${file}`
+  });
+  pose.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+  });
+  pose.onResults(onResults);
 
-  function onResults(results){
-    // draw
+  // Draw / results handling
+  function onResults(results) {
+    if (!results) return;
+    // draw camera image
     canvasEl.width = videoEl.videoWidth;
     canvasEl.height = videoEl.videoHeight;
     ctx.save();
     ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
-    ctx.drawImage(results.image,0,0,canvasEl.width,canvasEl.height);
+    ctx.drawImage(results.image, 0, 0, canvasEl.width, canvasEl.height);
 
     if (results.poseLandmarks) {
-      // draw skeleton & landmarks
+      // draw connectors & landmarks
       drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color:'#39ffcc', lineWidth:2});
       drawLandmarks(ctx, results.poseLandmarks, {color:'#ff6bcb', radius:3});
 
-      // highlight key points
+      // highlight key points for upper-body
       const highlight = ['left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','nose'];
       for (const n of highlight) {
         const idx = UPPER_INDICES[n];
@@ -428,185 +183,173 @@
         const x = lm.x * canvasEl.width;
         const y = lm.y * canvasEl.height;
         ctx.beginPath();
-        ctx.arc(x,y,6,0,2*Math.PI);
+        ctx.arc(x, y, 6, 0, 2*Math.PI);
         ctx.fillStyle = 'rgba(255,215,0,0.95)';
         ctx.fill();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.strokeStyle = 'rgba(0,0,0,0.25)';
         ctx.stroke();
       }
 
-      const landmarkObjects = buildLandmarkObjects(results.poseLandmarks);
-      lastFrameCompact = { timestamp: Date.now(), landmarks: landmarkObjects };
-
-      // show compact JSON (pretty)
-      compactOut.innerText = JSON.stringify(lastFrameCompact, null, 2);
-
-      // send
-      throttledSend(lastFrameCompact);
+      // compact landmark objects
+      const compact = buildLandmarkObjects(results.poseLandmarks);
+      jsonOut.innerText = JSON.stringify({timestamp: Date.now(), landmarks: compact}, null, 2);
+    } else {
+      // no landmarks yet
+      // leave camera image only
     }
     ctx.restore();
+
+    // FPS counting
+    fpsCounter.frames++;
+    const now = performance.now();
+    if (now - fpsCounter.last >= 1000) {
+      fpsCounter.fps = Math.round((fpsCounter.frames * 1000) / (now - fpsCounter.last));
+      fpsCounter.last = now;
+      fpsCounter.frames = 0;
+      fpsEl.innerText = fpsCounter.fps;
+    }
+    frameCount++;
+    framesEl.innerText = frameCount;
   }
 
-  // --- WebSocket handling and auto-scan
-  function connectWebsocket(url, onOpenCb){
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-      updateDetail('Already connecting/connected');
-      return;
+  function buildLandmarkObjects(poseLandmarks) {
+    if (!poseLandmarks) return [];
+    const out = [];
+    for (const [name, idx] of Object.entries(UPPER_INDICES)) {
+      const lm = poseLandmarks[idx];
+      if (!lm) continue;
+      out.push({
+        name,
+        index: idx,
+        x: Number(lm.x.toFixed(6)),
+        y: Number(lm.y.toFixed(6)),
+        z: Number(lm.z.toFixed(6)),
+        visibility: lm.visibility !== undefined ? Number(lm.visibility.toFixed(3)) : 1.0
+      });
     }
+    return out;
+  }
+
+  // enumerate cameras
+  async function enumerateCameras() {
     try {
-      ws = new WebSocket(url);
+      // To get labels, ensure permission once (no lasting stream kept)
+      if (!stream) {
+        const s = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
+        s.getTracks().forEach(t => t.stop());
+      }
     } catch (e) {
-      updateDetail('Invalid WebSocket URL');
-      setConnStatus('Bad URL', 'red');
-      return;
+      // user may deny — still try to enumerate (labels may be empty)
     }
-    ws.binaryType = 'arraybuffer';
-    serverUrl.innerText = url;
-    wsUrlEl.value = url;
-    setConnStatus('Connecting...', 'yellow');
-    updateDetail('Attempting connection to ' + url);
-
-    // connection timeout
-    const tOut = setTimeout(() => {
-      if (ws && ws.readyState !== WebSocket.OPEN) {
-        try { ws.close(); } catch(e){}
-        updateDetail('Connection timed out');
-        setConnStatus('Timed out', 'red');
-      }
-    }, 2000);
-
-    ws.onopen = () => {
-      clearTimeout(tOut);
-      setConnStatus('Connected', 'green');
-      updateDetail('Connected — streaming frames');
-      connDot.classList.add('pulse');
-      connectBtn.innerText = 'Disconnect';
-      connectBtn.classList.remove('warn');
-      if (onOpenCb) onOpenCb();
-    };
-    ws.onclose = (ev) => {
-      clearTimeout(tOut);
-      connDot.classList.remove('pulse');
-      setConnStatus('Disconnected', 'red');
-      updateDetail('WebSocket closed (code ' + (ev.code||'') + ')');
-      connectBtn.innerText = 'Connect';
-    };
-    ws.onerror = (ev) => {
-      clearTimeout(tOut);
-      setConnStatus('Error', 'red');
-      updateDetail('WebSocket error');
-    };
-    ws.onmessage = (ev) => {
-      // optional echo/backchannel messages; show small toast
-      try {
-        const msg = typeof ev.data === 'string' ? ev.data : '[binary]';
-        // show small preview
-        jsonOut.innerText = 'Received: ' + (msg.length>400?msg.slice(0,400)+'…':msg);
-      } catch (e){}
-    };
-  }
-
-  connectBtn.addEventListener('click', () => {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.close();
-      return;
-    }
-    const url = wsUrlEl.value.trim();
-    if (!url) { updateDetail('Enter WebSocket URL'); return; }
-    connectWebsocket(url);
-  });
-
-  // Auto-scan common local ports to find a listening server quickly
-  const COMMON_PORTS = [8765, 8080, 3000, 8000, 9000, 10000];
-  scanBtn.addEventListener('click', scanLocalServers);
-
-  async function scanLocalServers(){
-    updateDetail('Scanning local ports...');
-    setConnStatus('Scanning...', 'yellow');
-    for (const port of COMMON_PORTS) {
-      // try localhost and 127.0.0.1
-      for (const host of ['localhost','127.0.0.1']) {
-        const trial = `ws://${host}:${port}${DEFAULT_PATH}`;
-        // attempt connection with small timeout
-        const success = await tryConnectOnce(trial, 1200);
-        if (success) {
-          updateDetail('Found server at ' + trial);
-          connectWebsocket(trial);
-          return;
-        }
-      }
-    }
-    updateDetail('No local WebSocket server found on common ports.');
-    setConnStatus('No server', 'red');
-  }
-
-  function tryConnectOnce(url, timeoutMs=1000){
-    return new Promise((resolve) => {
-      let ok = false;
-      let sock;
-      try {
-        sock = new WebSocket(url);
-      } catch (e) {
-        resolve(false);
-        return;
-      }
-      const t = setTimeout(() => {
-        if (sock && sock.readyState !== WebSocket.OPEN) {
-          try{ sock.close(); }catch(e){}
-          resolve(false);
-        }
-      }, timeoutMs);
-      sock.onopen = () => {
-        ok = true;
-        clearTimeout(t);
-        try{ sock.close(); }catch(e){}
-        resolve(true);
-      };
-      sock.onerror = () => {
-        clearTimeout(t);
-        try{ sock.close(); }catch(e){}
-        resolve(false);
-      };
-      sock.onclose = () => {
-        if (!ok) { clearTimeout(t); resolve(false); }
-      };
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const videoInputs = devices.filter(d => d.kind === 'videoinput');
+    cameraSelect.innerHTML = '';
+    videoInputs.forEach((d,i) => {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.innerText = d.label || `Camera ${i+1}`;
+      cameraSelect.appendChild(opt);
     });
-  }
-
-  async function tryAutoConnectDefault(){
-    const url = wsUrlEl.value;
-    try {
-      await new Promise((res)=>setTimeout(res, 300));
-      // try connect but if fails silently don't spam
-      connectWebsocket(url);
-    } catch (e) { /* ignore */ }
-  }
-
-  // --- Throttled send
-  function throttledSend(frame){
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    const now = Date.now();
-    if (now - lastSend < sendThrottleMs) return;
-    lastSend = now;
-    const payload = JSON.stringify(frame);
-    try {
-      ws.send(payload);
-      sentCount++;
-      sentCountEl.innerText = sentCount;
-      lastSentTimeEl.innerText = new Date(now).toLocaleTimeString();
-      jsonOut.innerText = payload.length>2000 ? payload.slice(0,2000)+'…' : payload;
-    } catch (e) {
-      updateDetail('Send error: ' + (e.message || e));
+    if (videoInputs.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.innerText = 'No camera found';
+      cameraSelect.appendChild(opt);
     }
   }
 
-  // ensure a graceful unload
+  // start camera using getUserMedia and a stable frame callback
+  async function startCamera(deviceId, width=1280, height=720) {
+    stopCamera();
+    try {
+      const constraints = {
+        video: {
+          width: { ideal: width },
+          height: { ideal: height },
+          deviceId: deviceId ? { exact: deviceId } : undefined
+        },
+        audio: false
+      };
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      videoEl.srcObject = stream;
+      await videoEl.play();
+
+      cameraInfo.innerText = `Camera: ${cameraSelect.selectedOptions[0]?.text || 'Camera'}`;
+      resInfo.innerText = `Resolution: ${videoEl.videoWidth} × ${videoEl.videoHeight}`;
+
+      // start processing frames using requestVideoFrameCallback when available (most modern browsers)
+      running = true;
+      frameCount = 0;
+      // If browser supports requestVideoFrameCallback (fast & exact per-frame)
+      if (typeof videoEl.requestVideoFrameCallback === 'function') {
+        const frameCallback = async (now, metadata) => {
+          if (!running) return;
+          // send the current video frame to MediaPipe
+          try {
+            // don't await to avoid blocking the callback loop; MediaPipe handles queueing internally
+            pose.send({image: videoEl});
+          } catch (e) {
+            console.warn('pose.send error', e);
+          }
+          // request next callback
+          videoEl.requestVideoFrameCallback(frameCallback);
+        };
+        videoEl.requestVideoFrameCallback(frameCallback);
+      } else {
+        // fallback to an interval approximating the target based on video frame rate (safe)
+        intervalId = setInterval(() => {
+          if (!running) return;
+          if (videoEl.readyState >= 2) {
+            try {
+              pose.send({image: videoEl});
+            } catch (e) { /* ignore */ }
+          }
+        }, 1000 / 30);
+      }
+    } catch (e) {
+      console.error('startCamera error', e);
+      cameraInfo.innerText = 'Camera error: ' + (e.message || e);
+    }
+  }
+
+  function stopCamera() {
+    running = false;
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    try { videoEl.pause(); } catch (e) {}
+    videoEl.srcObject = null;
+    cameraInfo.innerText = 'Camera: —';
+    resInfo.innerText = 'Resolution: —';
+  }
+
+  // UI events
+  startBtn.addEventListener('click', async () => {
+    const devId = cameraSelect.value || null;
+    const [w,h] = (resSelect.value || '1280x720').split('x').map(Number);
+    await startCamera(devId, w, h);
+  });
+  stopBtn.addEventListener('click', () => stopCamera());
+
+  // initial setup
+  (async () => {
+    await enumerateCameras();
+    // auto-select first camera if available
+    if (cameraSelect.options.length > 0) cameraSelect.selectedIndex = 0;
+    // optional: start immediately with first camera
+    // await startCamera(cameraSelect.value, ... );
+  })();
+
+  // cleanup on unload
   window.addEventListener('beforeunload', () => {
-    if (ws) try { ws.close(); } catch(e){}
     stopCamera();
   });
-
   </script>
 </body>
 </html>
