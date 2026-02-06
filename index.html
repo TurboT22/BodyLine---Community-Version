@@ -3,69 +3,48 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MediaPipe Upper-Body Demo — Focused Tracker</title>
-
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <title>MediaPipe Pose — Debug & Fix</title>
   <style>
-    :root{
-      --bg: #071024;
-      --card: rgba(255,255,255,0.03);
-      --muted: #9fb0bd;
-      --accent: #72f0d8;
-    }
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#e6f7f5;background:linear-gradient(180deg,#04101a,#071629);}
-    .wrap{max-width:1100px;margin:28px auto;padding:20px;}
-    header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
-    header h1{margin:0;font-size:1.25rem}
-    .layout{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
-    .card{background:var(--card);border-radius:12px;padding:12px;border:1px solid rgba(255,255,255,0.02);backdrop-filter: blur(8px);box-shadow:0 8px 30px rgba(2,8,20,0.6)}
-    .video-wrap{position:relative;border-radius:10px;overflow:hidden}
-    video{display:block;width:100%;height:auto;background:#000;transform:scaleX(-1)}
-    canvas.overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;transform:scaleX(-1)}
-    .controls{display:flex;flex-direction:column;gap:10px}
-    label{display:block;font-size:0.85rem;color:var(--muted);margin-bottom:6px}
-    select,input[type=text]{width:100%;padding:8px 10px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:#eaf7f6}
-    button{padding:8px 12px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--accent),#8ee1a9);color:#012;font-weight:700;cursor:pointer}
-    .row{display:flex;gap:8px}
-    .stats{display:flex;gap:12px;align-items:center;color:var(--muted);font-size:0.9rem}
-    .json-box{font-family:SFMono-Regular,Menlo,monospace;background:rgba(0,0,0,0.18);padding:8px;border-radius:8px;max-height:240px;overflow:auto;color:#cbeef0;border:1px solid rgba(255,255,255,0.02)}
-    footer{margin-top:12px;color:var(--muted);font-size:0.85rem}
-    @media (max-width:980px){ .layout{grid-template-columns:1fr; } }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#071025; color:#e6f7f5; margin:0; padding:18px; }
+    .wrap { max-width:1100px; margin:0 auto; }
+    h1 { margin:0 0 8px 0; font-size:20px }
+    .row { display:flex; gap:12px; align-items:center; margin:10px 0; }
+    .card { background:rgba(255,255,255,0.02); padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); }
+    video { width:100%; max-width:880px; border-radius:8px; background:#000; transform:scaleX(-1); }
+    canvas.overlay { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; transform:scaleX(-1) }
+    #videoWrap { position:relative; display:inline-block; }
+    select,input[type=text],button { padding:8px 10px; border-radius:8px; border:0; background:rgba(255,255,255,0.02); color:inherit }
+    .status { font-size:0.9rem; color:#9fb0bd }
+    .error { color:#ff9a9a }
+    pre { background: rgba(0,0,0,0.2); padding:10px; border-radius:8px; overflow:auto; max-height:220px; }
+    .hint { color:#9fb0bd; font-size:0.9rem }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
+    <h1>MediaPipe Pose — Debug & Fix</h1>
+    <div class="row">
       <div>
-        <h1>MediaPipe Upper-Body Demo — Tracker Only</h1>
-        <div style="color:var(--muted);font-size:0.95rem">No network/WebSocket — just camera + MediaPipe pose visualization and compact JSON preview.</div>
-      </div>
-      <div class="stats">
-        <div>FPS: <strong id="fps">0</strong></div>
-        <div>Frames: <strong id="frames">0</strong></div>
-      </div>
-    </header>
-
-    <div class="layout">
-      <!-- video -->
-      <div class="card">
-        <div class="video-wrap" id="videoCard">
-          <video id="input_video" autoplay playsinline muted></video>
-          <canvas id="output_canvas" class="overlay"></canvas>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;margin-top:10px;align-items:center">
-          <div style="color:var(--muted);font-size:0.9rem" id="cameraInfo">Camera: —</div>
-          <div style="color:var(--muted);font-size:0.9rem" id="resInfo">Resolution: —</div>
+        <div class="card" id="videoCard">
+          <div id="videoWrap">
+            <video id="input_video" autoplay playsinline muted></video>
+            <canvas id="output_canvas" class="overlay"></canvas>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px">
+            <div class="status" id="cameraInfo">Camera: —</div>
+            <div class="status" id="modelInfo">Model: —</div>
+          </div>
         </div>
       </div>
 
-      <!-- controls -->
-      <div class="controls">
+      <div style="min-width:320px">
         <div class="card">
-          <label>Camera</label>
-          <select id="cameraSelect"></select>
-          <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="margin-bottom:8px"><strong>Controls</strong></div>
+          <div style="margin-bottom:8px">
+            <label>Camera:</label><br/>
+            <select id="cameraSelect"></select>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
             <select id="resSelect">
               <option value="1280x720">1280 × 720</option>
               <option value="960x540">960 × 540</option>
@@ -73,67 +52,103 @@
               <option value="320x240">320 × 240</option>
             </select>
             <button id="startBtn">Start</button>
-            <button id="stopBtn" style="background:linear-gradient(90deg,#ff9a9a,#ffbdbd);color:#300">Stop</button>
+            <button id="stopBtn">Stop</button>
           </div>
 
-          <hr style="margin:12px 0;border:none;height:1px;background:rgba(255,255,255,0.03)">
-
-          <label>Options</label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <label style="margin:0">Smoothing</label>
-            <input id="smoothToggle" type="checkbox" checked />
-          </div>
-
-          <div style="margin-top:12px">
-            <label>Compact last frame (preview)</label>
-            <div class="json-box" id="jsonOut">No frames processed yet.</div>
+          <div style="margin-top:8px">
+            <div class="hint">Important:</div>
+            <ul class="hint">
+              <li>Serve this file over HTTP (use the commands below) — opening via file:// will prevent the MediaPipe assets from loading.</li>
+              <li>Open DevTools (F12) and check Console for errors if MediaPipe still doesn't run.</li>
+            </ul>
           </div>
         </div>
 
-        <div class="card">
-          <div style="font-weight:700">Debug / Tips</div>
-          <ul style="color:var(--muted)">
-            <li>Allow camera access when the browser prompts. Device labels require permission.</li>
-            <li>If the feed pauses, press Stop then Start. This page uses requestVideoFrameCallback (fast) with a safe fallback.</li>
-            <li>This demo keeps all processing on the main thread for simplicity — you can move heavy logic to a worker if needed.</li>
-          </ul>
+        <div class="card" style="margin-top:10px">
+          <div><strong>Diagnostics</strong></div>
+          <div style="margin-top:8px">
+            <div><span class="status">Page protocol:</span> <span id="protocol"></span></div>
+            <div><span class="status">Pose class available:</span> <span id="poseAvailable">—</span></div>
+            <div><span class="status">Drawing utils available:</span> <span id="drawAvailable">—</span></div>
+            <div><span class="status">Last pose found:</span> <span id="lastFound">never</span></div>
+            <div><span class="status">Last detection score:</span> <span id="lastScore">—</span></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:10px">
+          <div><strong>Console snapshot</strong></div>
+          <pre id="consoleDump">No messages yet</pre>
         </div>
       </div>
     </div>
 
-    <footer>Built with MediaPipe Pose. Shows selected upper-body landmarks and a compact JSON output for debugging.</footer>
+    <div style="margin-top:12px" class="card">
+      <strong>Last compact frame (preview)</strong>
+      <pre id="jsonOut">No frames yet</pre>
+    </div>
+
+    <div style="margin-top:12px" class="hint">
+      Quick local server:
+      <ul>
+        <li>Python 3: <code>python -m http.server 8000</code></li>
+        <li>Node (npm): <code>npx http-server -c-1 . -p 8000</code></li>
+        <li>Then open: <code>http://localhost:8000/Index.html</code></li>
+      </ul>
+    </div>
   </div>
 
-  <!-- MediaPipe -->
+  <!-- MediaPipe pose + drawing_utils -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.4/drawing_utils.js"></script>
 
   <script>
-  // UI elements
+  // UI
   const videoEl = document.getElementById('input_video');
   const canvasEl = document.getElementById('output_canvas');
   const ctx = canvasEl.getContext('2d');
+
   const cameraSelect = document.getElementById('cameraSelect');
   const resSelect = document.getElementById('resSelect');
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
-  const jsonOut = document.getElementById('jsonOut');
+
+  const protocolEl = document.getElementById('protocol');
+  const poseAvailableEl = document.getElementById('poseAvailable');
+  const drawAvailableEl = document.getElementById('drawAvailable');
+  const lastFoundEl = document.getElementById('lastFound');
+  const lastScoreEl = document.getElementById('lastScore');
+  const consoleDump = document.getElementById('consoleDump');
   const cameraInfo = document.getElementById('cameraInfo');
-  const resInfo = document.getElementById('resInfo');
-  const fpsEl = document.getElementById('fps');
-  const framesEl = document.getElementById('frames');
-  const smoothToggle = document.getElementById('smoothToggle');
+  const modelInfo = document.getElementById('modelInfo');
+  const jsonOut = document.getElementById('jsonOut');
+
+  // small console capture for helpful copy/paste
+  const consoleLines = [];
+  function dumpConsole(msg){
+    consoleLines.push(msg);
+    if (consoleLines.length > 200) consoleLines.shift();
+    consoleDump.textContent = consoleLines.join('\n');
+    console.log(msg);
+  }
+
+  // protocol
+  protocolEl.innerText = location.protocol;
+
+  // quick feature checks
+  const hasPoseClass = typeof window.Pose === 'function' || typeof window.mpPose === 'object';
+  poseAvailableEl.innerText = hasPoseClass ? 'yes' : 'no';
+  drawAvailableEl.innerText = (typeof window.drawConnectors === 'function' && typeof window.drawLandmarks === 'function') ? 'yes' : 'no';
+  if (!hasPoseClass) {
+    dumpConsole('ERROR: Pose class is not available. Make sure the CDN script loaded and you are serving the page via http(s).');
+  }
 
   // state
   let stream = null;
   let running = false;
-  let frameCount = 0;
-  let lastFrameTime = performance.now();
-  let fpsCounter = {last: performance.now(), frames:0, fps:0};
-  let rvID = null; // requestVideoFrameCallback id (we store callback reference)
-  let intervalId = null;
+  let lastFoundAt = 0;
+  let lastScore = null;
 
-  // Upper landmarks we care about
+  // indices we care about
   const UPPER_INDICES = {
     "nose": 0,
     "left_shoulder": 11,
@@ -146,71 +161,33 @@
     "right_hip": 24
   };
 
-  // Setup MediaPipe Pose
-  const pose = new Pose({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${file}`
-  });
-  pose.setOptions({
-    modelComplexity: 1,
-    smoothLandmarks: true,
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.5
-  });
-  pose.onResults(onResults);
-
-  // Draw / results handling
-  function onResults(results) {
-    if (!results) return;
-    // draw camera image
-    canvasEl.width = videoEl.videoWidth;
-    canvasEl.height = videoEl.videoHeight;
-    ctx.save();
-    ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
-    ctx.drawImage(results.image, 0, 0, canvasEl.width, canvasEl.height);
-
-    if (results.poseLandmarks) {
-      // draw connectors & landmarks
-      drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color:'#39ffcc', lineWidth:2});
-      drawLandmarks(ctx, results.poseLandmarks, {color:'#ff6bcb', radius:3});
-
-      // highlight key points for upper-body
-      const highlight = ['left_shoulder','right_shoulder','left_elbow','right_elbow','left_wrist','right_wrist','nose'];
-      for (const n of highlight) {
-        const idx = UPPER_INDICES[n];
-        if (idx === undefined) continue;
-        const lm = results.poseLandmarks[idx];
-        if (!lm) continue;
-        const x = lm.x * canvasEl.width;
-        const y = lm.y * canvasEl.height;
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, 2*Math.PI);
-        ctx.fillStyle = 'rgba(255,215,0,0.95)';
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-        ctx.stroke();
-      }
-
-      // compact landmark objects
-      const compact = buildLandmarkObjects(results.poseLandmarks);
-      jsonOut.innerText = JSON.stringify({timestamp: Date.now(), landmarks: compact}, null, 2);
-    } else {
-      // no landmarks yet
-      // leave camera image only
+  // create Pose with robust locateFile and try-catch
+  let pose;
+  try {
+    if (typeof window.Pose === 'function') {
+      pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}` });
+    } else if (window.mpPose && window.mpPose.Pose) {
+      pose = new mpPose.Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}` });
     }
-    ctx.restore();
+  } catch (e) {
+    dumpConsole('Exception while creating Pose: ' + (e && e.message ? e.message : e));
+  }
 
-    // FPS counting
-    fpsCounter.frames++;
-    const now = performance.now();
-    if (now - fpsCounter.last >= 1000) {
-      fpsCounter.fps = Math.round((fpsCounter.frames * 1000) / (now - fpsCounter.last));
-      fpsCounter.last = now;
-      fpsCounter.frames = 0;
-      fpsEl.innerText = fpsCounter.fps;
-    }
-    frameCount++;
-    framesEl.innerText = frameCount;
+  if (!pose) {
+    modelInfo.innerText = 'Pose not created';
+    modelInfo.className = 'error';
+  } else {
+    modelInfo.innerText = 'Pose created';
+    poseAvailableEl.innerText = 'yes';
+    // options
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    pose.onResults(onResults);
+    dumpConsole('Pose initialized and onResults hooked.');
   }
 
   function buildLandmarkObjects(poseLandmarks) {
@@ -220,136 +197,185 @@
       const lm = poseLandmarks[idx];
       if (!lm) continue;
       out.push({
-        name,
-        index: idx,
-        x: Number(lm.x.toFixed(6)),
-        y: Number(lm.y.toFixed(6)),
-        z: Number(lm.z.toFixed(6)),
+        name, index: idx, x: Number(lm.x.toFixed(6)), y: Number(lm.y.toFixed(6)), z: Number(lm.z.toFixed(6)),
         visibility: lm.visibility !== undefined ? Number(lm.visibility.toFixed(3)) : 1.0
       });
     }
     return out;
   }
 
-  // enumerate cameras
-  async function enumerateCameras() {
+  // results handler with diagnostics
+  function onResults(results) {
     try {
-      // To get labels, ensure permission once (no lasting stream kept)
-      if (!stream) {
-        const s = await navigator.mediaDevices.getUserMedia({video:true, audio:false});
-        s.getTracks().forEach(t => t.stop());
+      if (!results) { dumpConsole('onResults called with null results'); return; }
+      // draw image
+      canvasEl.width = videoEl.videoWidth;
+      canvasEl.height = videoEl.videoHeight;
+      ctx.save();
+      ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
+      ctx.drawImage(results.image,0,0,canvasEl.width,canvasEl.height);
+
+      if (results.poseLandmarks && results.poseLandmarks.length) {
+        // draw (guard against missing drawing utils)
+        if (typeof window.drawConnectors === 'function') {
+          drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color:'#39ffcc', lineWidth:2});
+          drawLandmarks(ctx, results.poseLandmarks, {color:'#ff6bcb', radius:3});
+        }
+        // compute a detection "score" from nose/shoulder visibility if available
+        let vis = 0;
+        const sampleIdx = [0, 11, 12];
+        let count = 0;
+        for (const i of sampleIdx) {
+          const lm = results.poseLandmarks[i];
+          if (lm && lm.visibility !== undefined) { vis += lm.visibility; count++; }
+        }
+        const score = count ? (vis / count) : null;
+        lastScore = score;
+        lastScoreEl.innerText = score !== null ? score.toFixed(3) : 'n/a';
+
+        lastFoundAt = Date.now();
+        lastFoundEl.innerText = new Date(lastFoundAt).toLocaleTimeString();
+
+        const compact = buildLandmarkObjects(results.poseLandmarks);
+        jsonOut.innerText = JSON.stringify({ timestamp: Date.now(), landmarks: compact }, null, 2);
+      } else {
+        // no landmarks found this frame
+        // keep last info but show not-found after 2s
+        if (Date.now() - lastFoundAt > 2000) {
+          lastFoundEl.innerText = 'none (no landmark detected)';
+        }
       }
+      ctx.restore();
     } catch (e) {
-      // user may deny — still try to enumerate (labels may be empty)
-    }
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoInputs = devices.filter(d => d.kind === 'videoinput');
-    cameraSelect.innerHTML = '';
-    videoInputs.forEach((d,i) => {
-      const opt = document.createElement('option');
-      opt.value = d.deviceId;
-      opt.innerText = d.label || `Camera ${i+1}`;
-      cameraSelect.appendChild(opt);
-    });
-    if (videoInputs.length === 0) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.innerText = 'No camera found';
-      cameraSelect.appendChild(opt);
+      dumpConsole('onResults exception: ' + (e && e.message ? e.message : e));
     }
   }
 
-  // start camera using getUserMedia and a stable frame callback
+  // enumerate cameras
+  async function enumerateCameras() {
+    try {
+      // request permission first so labels are available
+      if (!stream) {
+        try {
+          const p = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+          p.getTracks().forEach(t => t.stop());
+        } catch (e) {
+          // user may deny; proceed to enumerate anyway
+        }
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      cameraSelect.innerHTML = '';
+      videoInputs.forEach((d,i) => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `Camera ${i+1}`;
+        cameraSelect.appendChild(opt);
+      });
+      if (videoInputs.length === 0) {
+        const opt = document.createElement('option'); opt.value=''; opt.textContent='No camera';
+        cameraSelect.appendChild(opt);
+      }
+      dumpConsole('Cameras enumerated: ' + videoInputs.length);
+    } catch (e) {
+      dumpConsole('enumerateCameras error: ' + e);
+    }
+  }
+
+  // start camera and pumping frames to pose
   async function startCamera(deviceId, width=1280, height=720) {
     stopCamera();
     try {
-      const constraints = {
-        video: {
-          width: { ideal: width },
-          height: { ideal: height },
-          deviceId: deviceId ? { exact: deviceId } : undefined
-        },
-        audio: false
-      };
+      cameraInfo.textContent = 'Starting camera…';
+      const constraints = { video: { width:{ideal:width}, height:{ideal:height}, deviceId: deviceId ? { exact: deviceId } : undefined }, audio:false };
       stream = await navigator.mediaDevices.getUserMedia(constraints);
       videoEl.srcObject = stream;
       await videoEl.play();
+      cameraInfo.textContent = cameraSelect.selectedOptions[0]?.text || 'Camera';
+      // adjust canvas
+      canvasEl.width = videoEl.videoWidth;
+      canvasEl.height = videoEl.videoHeight;
 
-      cameraInfo.innerText = `Camera: ${cameraSelect.selectedOptions[0]?.text || 'Camera'}`;
-      resInfo.innerText = `Resolution: ${videoEl.videoWidth} × ${videoEl.videoHeight}`;
+      if (!pose) {
+        dumpConsole('Cannot start pose processing: pose object missing.');
+        return;
+      }
 
-      // start processing frames using requestVideoFrameCallback when available (most modern browsers)
       running = true;
-      frameCount = 0;
-      // If browser supports requestVideoFrameCallback (fast & exact per-frame)
+      modelInfo.textContent = 'Running';
+      // prefer requestVideoFrameCallback
       if (typeof videoEl.requestVideoFrameCallback === 'function') {
-        const frameCallback = async (now, metadata) => {
+        const loop = (now, metadata) => {
           if (!running) return;
-          // send the current video frame to MediaPipe
           try {
-            // don't await to avoid blocking the callback loop; MediaPipe handles queueing internally
-            pose.send({image: videoEl});
+            pose.send({ image: videoEl });
           } catch (e) {
-            console.warn('pose.send error', e);
+            dumpConsole('pose.send error: ' + (e && e.message ? e.message : e));
           }
-          // request next callback
-          videoEl.requestVideoFrameCallback(frameCallback);
+          videoEl.requestVideoFrameCallback(loop);
         };
-        videoEl.requestVideoFrameCallback(frameCallback);
+        videoEl.requestVideoFrameCallback(loop);
       } else {
-        // fallback to an interval approximating the target based on video frame rate (safe)
-        intervalId = setInterval(() => {
+        // fallback to interval
+        const fps = 30;
+        setInterval(() => {
           if (!running) return;
           if (videoEl.readyState >= 2) {
-            try {
-              pose.send({image: videoEl});
-            } catch (e) { /* ignore */ }
+            try { pose.send({ image: videoEl }); } catch (e) { dumpConsole('pose.send error: ' + e); }
           }
-        }, 1000 / 30);
+        }, 1000 / fps);
       }
+
+      dumpConsole('Camera started at resolution ' + videoEl.videoWidth + 'x' + videoEl.videoHeight);
     } catch (e) {
-      console.error('startCamera error', e);
-      cameraInfo.innerText = 'Camera error: ' + (e.message || e);
+      dumpConsole('startCamera error: ' + (e && e.message ? e.message : e));
+      cameraInfo.textContent = 'Camera error';
+      modelInfo.textContent = 'Stopped';
     }
   }
 
   function stopCamera() {
     running = false;
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
     if (stream) {
       stream.getTracks().forEach(t => t.stop());
       stream = null;
     }
-    try { videoEl.pause(); } catch (e) {}
+    try { videoEl.pause(); } catch (e){}
     videoEl.srcObject = null;
-    cameraInfo.innerText = 'Camera: —';
-    resInfo.innerText = 'Resolution: —';
+    cameraInfo.textContent = 'Stopped';
+    modelInfo.textContent = 'Stopped';
+    dumpConsole('Camera stopped.');
   }
 
-  // UI events
   startBtn.addEventListener('click', async () => {
-    const devId = cameraSelect.value || null;
+    const id = cameraSelect.value || null;
     const [w,h] = (resSelect.value || '1280x720').split('x').map(Number);
-    await startCamera(devId, w, h);
+    await startCamera(id, w, h);
   });
   stopBtn.addEventListener('click', () => stopCamera());
 
-  // initial setup
-  (async () => {
+  // quick checks for common failure modes
+  (async function init(){
+    dumpConsole('Initializing debug page.');
     await enumerateCameras();
-    // auto-select first camera if available
     if (cameraSelect.options.length > 0) cameraSelect.selectedIndex = 0;
-    // optional: start immediately with first camera
-    // await startCamera(cameraSelect.value, ... );
+    // warn if opened via file://
+    if (location.protocol === 'file:') {
+      dumpConsole('WARNING: Page opened via file:// — MediaPipe assets may fail to load. Please serve over http://localhost:8000 or similar.');
+    }
+    // show whether drawConnectors exists
+    drawAvailableEl.innerText = (typeof window.drawConnectors === 'function') ? 'yes' : 'no';
+    // small timeout: if no onResults called within 2s after starting camera, warn
+    setInterval(() => {
+      if (!running) return;
+      if (Date.now() - lastFoundAt > 3000) {
+        dumpConsole('No pose landmarks detected in the last ~3s. Possible causes: model not loaded, occlusion, or camera not providing frames to MediaPipe.');
+      }
+    }, 4000);
   })();
 
-  // cleanup on unload
-  window.addEventListener('beforeunload', () => {
-    stopCamera();
-  });
+  // expose some debugging helpers to console
+  window.__mp_debug = { pose, startCamera, stopCamera, enumerateCameras };
   </script>
 </body>
 </html>
