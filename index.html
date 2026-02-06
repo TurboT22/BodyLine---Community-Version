@@ -1,381 +1,344 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MediaPipe Pose — Debug & Fix</title>
-  <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#071025; color:#e6f7f5; margin:0; padding:18px; }
-    .wrap { max-width:1100px; margin:0 auto; }
-    h1 { margin:0 0 8px 0; font-size:20px }
-    .row { display:flex; gap:12px; align-items:center; margin:10px 0; }
-    .card { background:rgba(255,255,255,0.02); padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); }
-    video { width:100%; max-width:880px; border-radius:8px; background:#000; transform:scaleX(-1); }
-    canvas.overlay { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; transform:scaleX(-1) }
-    #videoWrap { position:relative; display:inline-block; }
-    select,input[type=text],button { padding:8px 10px; border-radius:8px; border:0; background:rgba(255,255,255,0.02); color:inherit }
-    .status { font-size:0.9rem; color:#9fb0bd }
-    .error { color:#ff9a9a }
-    pre { background: rgba(0,0,0,0.2); padding:10px; border-radius:8px; overflow:auto; max-height:220px; }
-    .hint { color:#9fb0bd; font-size:0.9rem }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MediaPipe Pose — Deep Debug Page</title>
+<style>
+  body{margin:12px;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;background:#071021;color:#e6f7f5}
+  h1{margin:0 0 8px}
+  .layout{display:grid;grid-template-columns:620px 360px;gap:12px}
+  .card{background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+  video{width:100%;border-radius:8px;transform:scaleX(-1);background:#000}
+  canvas.overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;transform:scaleX(-1)}
+  .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+  label{font-size:0.9rem;color:#9fb0bd}
+  input,select,button{padding:8px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:inherit}
+  pre{background:rgba(0,0,0,0.2);padding:8px;border-radius:8px;max-height:260px;overflow:auto}
+  .ok{color:#7ef2c7}.bad{color:#ff9a9a}
+  .small{font-size:0.86rem;color:#9fb0bd}
+  .hint{font-size:0.88rem;color:#9fb0bd;margin-top:8px}
+  @media(max-width:980px){ .layout{grid-template-columns:1fr} }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>MediaPipe Pose — Debug & Fix</h1>
-    <div class="row">
-      <div>
-        <div class="card" id="videoCard">
-          <div id="videoWrap">
-            <video id="input_video" autoplay playsinline muted></video>
-            <canvas id="output_canvas" class="overlay"></canvas>
+  <h1>MediaPipe Pose — Deep Debug</h1>
+  <div class="layout">
+    <div>
+      <div class="card">
+        <div style="position:relative">
+          <video id="input_video" autoplay playsinline muted></video>
+          <canvas id="overlay" class="overlay"></canvas>
+        </div>
+
+        <div class="row" style="margin-top:10px;justify-content:space-between">
+          <div>
+            <div class="small">Camera: <span id="cameraLabel">—</span></div>
+            <div class="small">Resolution: <span id="resLabel">—</span></div>
           </div>
-          <div style="display:flex;justify-content:space-between;margin-top:8px">
-            <div class="status" id="cameraInfo">Camera: —</div>
-            <div class="status" id="modelInfo">Model: —</div>
+          <div style="text-align:right">
+            <div class="small">Model: <span id="modelLabel">—</span></div>
+            <div class="small">Last found: <span id="lastFound">never</span></div>
           </div>
         </div>
       </div>
 
-      <div style="min-width:320px">
-        <div class="card">
-          <div style="margin-bottom:8px"><strong>Controls</strong></div>
-          <div style="margin-bottom:8px">
-            <label>Camera:</label><br/>
-            <select id="cameraSelect"></select>
-          </div>
-          <div style="display:flex;gap:8px;margin-bottom:10px">
-            <select id="resSelect">
-              <option value="1280x720">1280 × 720</option>
-              <option value="960x540">960 × 540</option>
-              <option value="640x480">640 × 480</option>
-              <option value="320x240">320 × 240</option>
-            </select>
-            <button id="startBtn">Start</button>
-            <button id="stopBtn">Stop</button>
-          </div>
+      <div class="card" style="margin-top:12px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label>Model complexity</label>
+          <select id="modelComplexity">
+            <option value="0">0 (fast)</option>
+            <option value="1" selected>1 (balanced)</option>
+            <option value="2">2 (accurate)</option>
+          </select>
 
-          <div style="margin-top:8px">
-            <div class="hint">Important:</div>
-            <ul class="hint">
-              <li>Serve this file over HTTP (use the commands below) — opening via file:// will prevent the MediaPipe assets from loading.</li>
-              <li>Open DevTools (F12) and check Console for errors if MediaPipe still doesn't run.</li>
-            </ul>
-          </div>
+          <label>minDetectionConfidence</label>
+          <input id="minDetect" type="range" min="0" max="1" step="0.05" value="0.5" />
+
+          <label>minTrackingConfidence</label>
+          <input id="minTrack" type="range" min="0" max="1" step="0.05" value="0.5" />
         </div>
 
-        <div class="card" style="margin-top:10px">
-          <div><strong>Diagnostics</strong></div>
-          <div style="margin-top:8px">
-            <div><span class="status">Page protocol:</span> <span id="protocol"></span></div>
-            <div><span class="status">Pose class available:</span> <span id="poseAvailable">—</span></div>
-            <div><span class="status">Drawing utils available:</span> <span id="drawAvailable">—</span></div>
-            <div><span class="status">Last pose found:</span> <span id="lastFound">never</span></div>
-            <div><span class="status">Last detection score:</span> <span id="lastScore">—</span></div>
-          </div>
+        <div class="row" style="margin-top:10px">
+          <label>Camera device</label>
+          <select id="cameraSelect"></select>
+          <select id="resSelect">
+            <option value="1280x720">1280×720</option>
+            <option value="960x540">960×540</option>
+            <option value="640x480">640×480</option>
+            <option value="320x240">320×240</option>
+          </select>
+          <button id="startBtn">Start</button>
+          <button id="stopBtn">Stop</button>
         </div>
 
-        <div class="card" style="margin-top:10px">
-          <div><strong>Console snapshot</strong></div>
-          <pre id="consoleDump">No messages yet</pre>
+        <div class="hint">
+          Tips: Ensure your upper body is visible (shoulders, chest). Good lighting helps. If you see model loaded but no landmarks, try lowering minDetectionConfidence and stepping back from camera.
         </div>
       </div>
     </div>
 
-    <div style="margin-top:12px" class="card">
-      <strong>Last compact frame (preview)</strong>
-      <pre id="jsonOut">No frames yet</pre>
-    </div>
+    <div>
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:6px">Live Diagnostics</div>
+        <div class="small">Protocol: <span id="protocol"></span></div>
+        <div class="small">SharedArrayBuffer: <span id="sab"></span></div>
+        <div class="small">requestVideoFrameCallback: <span id="rvfc"></span></div>
+        <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:8px 0">
+        <div class="small">pose.send calls: <strong id="sendCount">0</strong></div>
+        <div class="small">onResults calls: <strong id="resultsCount">0</strong></div>
+        <div class="small">last pose landmarks count: <strong id="lastCount">0</strong></div>
+        <div class="small">last visibility avg: <strong id="lastVis">—</strong></div>
+        <div class="small">last pose first landmark (x,y,z): <strong id="firstLM">—</strong></div>
+        <div style="margin-top:8px">
+          <button id="dumpConsole">Show console log (panel)</button>
+        </div>
+      </div>
 
-    <div style="margin-top:12px" class="hint">
-      Quick local server:
-      <ul>
-        <li>Python 3: <code>python -m http.server 8000</code></li>
-        <li>Node (npm): <code>npx http-server -c-1 . -p 8000</code></li>
-        <li>Then open: <code>http://localhost:8000/Index.html</code></li>
-      </ul>
+      <div class="card" style="margin-top:12px">
+        <div style="font-weight:700;margin-bottom:6px">Full log</div>
+        <pre id="log">initializing...</pre>
+      </div>
     </div>
   </div>
 
-  <!-- MediaPipe pose + drawing_utils -->
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.4/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.4/drawing_utils.js"></script>
 
-  <script>
-  // UI
-  const videoEl = document.getElementById('input_video');
-  const canvasEl = document.getElementById('output_canvas');
-  const ctx = canvasEl.getContext('2d');
-
+<script>
+  // UI refs
+  const video = document.getElementById('input_video');
+  const overlay = document.getElementById('overlay');
+  const ctx = overlay.getContext('2d');
   const cameraSelect = document.getElementById('cameraSelect');
   const resSelect = document.getElementById('resSelect');
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
+  const modelComplexityEl = document.getElementById('modelComplexity');
+  const minDetectEl = document.getElementById('minDetect');
+  const minTrackEl = document.getElementById('minTrack');
 
   const protocolEl = document.getElementById('protocol');
-  const poseAvailableEl = document.getElementById('poseAvailable');
-  const drawAvailableEl = document.getElementById('drawAvailable');
+  const sabEl = document.getElementById('sab');
+  const rvfcEl = document.getElementById('rvfc');
+  const sendCountEl = document.getElementById('sendCount');
+  const resultsCountEl = document.getElementById('resultsCount');
+  const lastCountEl = document.getElementById('lastCount');
+  const lastVisEl = document.getElementById('lastVis');
+  const firstLMEl = document.getElementById('firstLM');
+  const cameraLabel = document.getElementById('cameraLabel');
+  const resLabel = document.getElementById('resLabel');
+  const modelLabel = document.getElementById('modelLabel');
   const lastFoundEl = document.getElementById('lastFound');
-  const lastScoreEl = document.getElementById('lastScore');
-  const consoleDump = document.getElementById('consoleDump');
-  const cameraInfo = document.getElementById('cameraInfo');
-  const modelInfo = document.getElementById('modelInfo');
-  const jsonOut = document.getElementById('jsonOut');
+  const logEl = document.getElementById('log');
 
-  // small console capture for helpful copy/paste
-  const consoleLines = [];
-  function dumpConsole(msg){
-    consoleLines.push(msg);
-    if (consoleLines.length > 200) consoleLines.shift();
-    consoleDump.textContent = consoleLines.join('\n');
+  // env
+  protocolEl.innerText = location.protocol;
+  sabEl.innerText = (typeof SharedArrayBuffer !== 'undefined') ? 'yes' : 'no';
+  rvfcEl.innerText = (typeof video.requestVideoFrameCallback === 'function') ? 'yes' : 'no';
+
+  // state counters
+  let sendCount = 0, resultsCount = 0;
+  let stream = null, running = false, poseInstance = null;
+
+  // logging helper
+  function log(msg){
+    const t = new Date().toLocaleTimeString();
+    logEl.textContent = `[${t}] ${msg}\n` + logEl.textContent;
     console.log(msg);
   }
 
-  // protocol
-  protocolEl.innerText = location.protocol;
-
-  // quick feature checks
-  const hasPoseClass = typeof window.Pose === 'function' || typeof window.mpPose === 'object';
-  poseAvailableEl.innerText = hasPoseClass ? 'yes' : 'no';
-  drawAvailableEl.innerText = (typeof window.drawConnectors === 'function' && typeof window.drawLandmarks === 'function') ? 'yes' : 'no';
-  if (!hasPoseClass) {
-    dumpConsole('ERROR: Pose class is not available. Make sure the CDN script loaded and you are serving the page via http(s).');
-  }
-
-  // state
-  let stream = null;
-  let running = false;
-  let lastFoundAt = 0;
-  let lastScore = null;
-
-  // indices we care about
-  const UPPER_INDICES = {
-    "nose": 0,
-    "left_shoulder": 11,
-    "right_shoulder": 12,
-    "left_elbow": 13,
-    "right_elbow": 14,
-    "left_wrist": 15,
-    "right_wrist": 16,
-    "left_hip": 23,
-    "right_hip": 24
-  };
-
-  // create Pose with robust locateFile and try-catch
-  let pose;
-  try {
-    if (typeof window.Pose === 'function') {
-      pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}` });
-    } else if (window.mpPose && window.mpPose.Pose) {
-      pose = new mpPose.Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}` });
-    }
-  } catch (e) {
-    dumpConsole('Exception while creating Pose: ' + (e && e.message ? e.message : e));
-  }
-
-  if (!pose) {
-    modelInfo.innerText = 'Pose not created';
-    modelInfo.className = 'error';
-  } else {
-    modelInfo.innerText = 'Pose created';
-    poseAvailableEl.innerText = 'yes';
-    // options
-    pose.setOptions({
-      modelComplexity: 1,
-      smoothLandmarks: true,
-      minDetectionConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
-    pose.onResults(onResults);
-    dumpConsole('Pose initialized and onResults hooked.');
-  }
-
-  function buildLandmarkObjects(poseLandmarks) {
-    if (!poseLandmarks) return [];
-    const out = [];
-    for (const [name, idx] of Object.entries(UPPER_INDICES)) {
-      const lm = poseLandmarks[idx];
-      if (!lm) continue;
-      out.push({
-        name, index: idx, x: Number(lm.x.toFixed(6)), y: Number(lm.y.toFixed(6)), z: Number(lm.z.toFixed(6)),
-        visibility: lm.visibility !== undefined ? Number(lm.visibility.toFixed(3)) : 1.0
-      });
-    }
-    return out;
-  }
-
-  // results handler with diagnostics
-  function onResults(results) {
+  // camera enumeration
+  async function enumerateCameras(){
     try {
-      if (!results) { dumpConsole('onResults called with null results'); return; }
+      // ask for permission once so labels are visible
+      try {
+        const p = await navigator.mediaDevices.getUserMedia({video:true});
+        p.getTracks().forEach(t => t.stop());
+      } catch(e){}
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      cameraSelect.innerHTML = '';
+      cams.forEach((c,i) => {
+        const opt = document.createElement('option');
+        opt.value = c.deviceId;
+        opt.textContent = c.label || `Camera ${i+1}`;
+        cameraSelect.appendChild(opt);
+      });
+      if (cams.length === 0) cameraSelect.innerHTML = '<option value="">No camera</option>';
+      log(`Found ${cams.length} camera(s)`);
+    } catch(e){
+      log('enumerateCameras error: ' + e);
+    }
+  }
+
+  // build a fresh Pose instance with current options
+  function makePoseInstance(){
+    try {
+      const locateFile = f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`;
+      const p = new Pose({ locateFile });
+      p.setOptions({
+        modelComplexity: Number(modelComplexityEl.value),
+        smoothLandmarks: true,
+        minDetectionConfidence: Number(minDetectEl.value),
+        minTrackingConfidence: Number(minTrackEl.value)
+      });
+      p.onResults(onResults);
+      return p;
+    } catch (e){
+      log('makePoseInstance error: ' + e);
+      return null;
+    }
+  }
+
+  // start camera and frame pump
+  async function startCamera(){
+    stopCamera();
+    const devId = cameraSelect.value || undefined;
+    const [w,h] = (resSelect.value||'1280x720').split('x').map(Number);
+    const constraints = { video: { width:{ ideal: w }, height:{ ideal: h }, deviceId: devId ? { exact: devId } : undefined }, audio:false };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = stream;
+      await video.play();
+      cameraLabel.innerText = cameraSelect.selectedOptions[0]?.text || 'camera';
+      resLabel.innerText = `${video.videoWidth}×${video.videoHeight}`;
+      overlay.width = video.videoWidth;
+      overlay.height = video.videoHeight;
+      log('Camera started — ' + video.videoWidth + 'x' + video.videoHeight);
+    } catch(e){
+      log('getUserMedia failed: ' + e.message);
+      return;
+    }
+
+    // prepare pose
+    poseInstance = makePoseInstance();
+    if (!poseInstance) {
+      log('Failed to create Pose instance.');
+      modelLabel.innerText = 'not created';
+      return;
+    }
+    modelLabel.innerText = 'created';
+
+    running = true;
+    // Counting/monitoring
+    sendCount = 0; resultsCount = 0;
+    sendCountEl.innerText = sendCount; resultsCountEl.innerText = resultsCount;
+
+    // frame pumping - prefer requestVideoFrameCallback
+    if (typeof video.requestVideoFrameCallback === 'function') {
+      const cb = (now, meta) => {
+        if (!running) return;
+        try {
+          poseInstance.send({ image: video });
+          sendCount++; sendCountEl.innerText = sendCount;
+          // log every 60 sends to avoid spam
+          if (sendCount % 120 === 0) log('pose.send called #' + sendCount + ' (rvfc meta: fps=' + (meta.presentedFrames||'?') + ')');
+        } catch(e){
+          log('pose.send exception: ' + e);
+        }
+        video.requestVideoFrameCallback(cb);
+      };
+      video.requestVideoFrameCallback(cb);
+    } else {
+      // fallback interval
+      const id = setInterval(() => {
+        if (!running) { clearInterval(id); return; }
+        try {
+          poseInstance.send({ image: video });
+          sendCount++; sendCountEl.innerText = sendCount;
+        } catch(e) { log('pose.send exception: ' + e); }
+      }, 1000/30);
+    }
+  }
+
+  function stopCamera(){
+    running = false;
+    try {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = null;
+      video.srcObject = null;
+    } catch(e){}
+    modelLabel.innerText = 'stopped';
+    log('Camera stopped');
+  }
+
+  // onResults — very verbose diagnostics
+  function onResults(results){
+    try {
+      resultsCount++; resultsCountEl.innerText = resultsCount;
       // draw image
-      canvasEl.width = videoEl.videoWidth;
-      canvasEl.height = videoEl.videoHeight;
+      overlay.width = video.videoWidth; overlay.height = video.videoHeight;
       ctx.save();
-      ctx.clearRect(0,0,canvasEl.width,canvasEl.height);
-      ctx.drawImage(results.image,0,0,canvasEl.width,canvasEl.height);
+      ctx.clearRect(0,0,overlay.width,overlay.height);
+      ctx.drawImage(results.image, 0, 0, overlay.width, overlay.height);
 
       if (results.poseLandmarks && results.poseLandmarks.length) {
-        // draw (guard against missing drawing utils)
-        if (typeof window.drawConnectors === 'function') {
-          drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color:'#39ffcc', lineWidth:2});
-          drawLandmarks(ctx, results.poseLandmarks, {color:'#ff6bcb', radius:3});
+        const lm = results.poseLandmarks;
+        // draw
+        if (typeof drawConnectors === 'function') {
+          drawConnectors(ctx, lm, POSE_CONNECTIONS, { color:'#39ffcc', lineWidth:2 });
+          drawLandmarks(ctx, lm, { color:'#ff6bcb', radius:3 });
         }
-        // compute a detection "score" from nose/shoulder visibility if available
-        let vis = 0;
-        const sampleIdx = [0, 11, 12];
-        let count = 0;
-        for (const i of sampleIdx) {
-          const lm = results.poseLandmarks[i];
-          if (lm && lm.visibility !== undefined) { vis += lm.visibility; count++; }
+        // compute average visibility (if available)
+        let visSum = 0, visCount = 0;
+        for (let i=0;i<lm.length;i++){
+          if (lm[i].visibility !== undefined) { visSum += lm[i].visibility; visCount++; }
         }
-        const score = count ? (vis / count) : null;
-        lastScore = score;
-        lastScoreEl.innerText = score !== null ? score.toFixed(3) : 'n/a';
-
-        lastFoundAt = Date.now();
-        lastFoundEl.innerText = new Date(lastFoundAt).toLocaleTimeString();
-
-        const compact = buildLandmarkObjects(results.poseLandmarks);
-        jsonOut.innerText = JSON.stringify({ timestamp: Date.now(), landmarks: compact }, null, 2);
+        const visAvg = visCount ? (visSum/visCount) : null;
+        lastVisEl.innerText = visAvg !== null ? visAvg.toFixed(3) : 'n/a';
+        lastCountEl.innerText = lm.length;
+        firstLMEl.innerText = `${Number(lm[0].x.toFixed(3))}, ${Number(lm[0].y.toFixed(3))}, ${Number(lm[0].z.toFixed(3))}`;
+        lastFoundEl.innerText = new Date().toLocaleTimeString();
+        log(`onResults: landmarks=${lm.length} visibilityAvg=${visAvg!==null?visAvg.toFixed(3):'n/a'}`);
       } else {
-        // no landmarks found this frame
-        // keep last info but show not-found after 2s
-        if (Date.now() - lastFoundAt > 2000) {
-          lastFoundEl.innerText = 'none (no landmark detected)';
-        }
+        // none found this frame
+        lastCountEl.innerText = 0;
+        lastVisEl.innerText = '—';
+        firstLMEl.innerText = '—';
+        const since = (Date.now() - (new Date(lastFoundEl.innerText).getTime()||0))/1000;
+        log('onResults: no landmarks found this frame');
       }
+
       ctx.restore();
-    } catch (e) {
-      dumpConsole('onResults exception: ' + (e && e.message ? e.message : e));
+    } catch(e){
+      log('onResults exception: ' + e);
     }
   }
 
-  // enumerate cameras
-  async function enumerateCameras() {
-    try {
-      // request permission first so labels are available
-      if (!stream) {
-        try {
-          const p = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
-          p.getTracks().forEach(t => t.stop());
-        } catch (e) {
-          // user may deny; proceed to enumerate anyway
-        }
-      }
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter(d => d.kind === 'videoinput');
-      cameraSelect.innerHTML = '';
-      videoInputs.forEach((d,i) => {
-        const opt = document.createElement('option');
-        opt.value = d.deviceId;
-        opt.textContent = d.label || `Camera ${i+1}`;
-        cameraSelect.appendChild(opt);
-      });
-      if (videoInputs.length === 0) {
-        const opt = document.createElement('option'); opt.value=''; opt.textContent='No camera';
-        cameraSelect.appendChild(opt);
-      }
-      dumpConsole('Cameras enumerated: ' + videoInputs.length);
-    } catch (e) {
-      dumpConsole('enumerateCameras error: ' + e);
-    }
-  }
-
-  // start camera and pumping frames to pose
-  async function startCamera(deviceId, width=1280, height=720) {
-    stopCamera();
-    try {
-      cameraInfo.textContent = 'Starting camera…';
-      const constraints = { video: { width:{ideal:width}, height:{ideal:height}, deviceId: deviceId ? { exact: deviceId } : undefined }, audio:false };
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      videoEl.srcObject = stream;
-      await videoEl.play();
-      cameraInfo.textContent = cameraSelect.selectedOptions[0]?.text || 'Camera';
-      // adjust canvas
-      canvasEl.width = videoEl.videoWidth;
-      canvasEl.height = videoEl.videoHeight;
-
-      if (!pose) {
-        dumpConsole('Cannot start pose processing: pose object missing.');
-        return;
-      }
-
-      running = true;
-      modelInfo.textContent = 'Running';
-      // prefer requestVideoFrameCallback
-      if (typeof videoEl.requestVideoFrameCallback === 'function') {
-        const loop = (now, metadata) => {
-          if (!running) return;
-          try {
-            pose.send({ image: videoEl });
-          } catch (e) {
-            dumpConsole('pose.send error: ' + (e && e.message ? e.message : e));
-          }
-          videoEl.requestVideoFrameCallback(loop);
-        };
-        videoEl.requestVideoFrameCallback(loop);
-      } else {
-        // fallback to interval
-        const fps = 30;
-        setInterval(() => {
-          if (!running) return;
-          if (videoEl.readyState >= 2) {
-            try { pose.send({ image: videoEl }); } catch (e) { dumpConsole('pose.send error: ' + e); }
-          }
-        }, 1000 / fps);
-      }
-
-      dumpConsole('Camera started at resolution ' + videoEl.videoWidth + 'x' + videoEl.videoHeight);
-    } catch (e) {
-      dumpConsole('startCamera error: ' + (e && e.message ? e.message : e));
-      cameraInfo.textContent = 'Camera error';
-      modelInfo.textContent = 'Stopped';
-    }
-  }
-
-  function stopCamera() {
-    running = false;
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    try { videoEl.pause(); } catch (e){}
-    videoEl.srcObject = null;
-    cameraInfo.textContent = 'Stopped';
-    modelInfo.textContent = 'Stopped';
-    dumpConsole('Camera stopped.');
-  }
-
+  // UI wiring
   startBtn.addEventListener('click', async () => {
-    const id = cameraSelect.value || null;
-    const [w,h] = (resSelect.value || '1280x720').split('x').map(Number);
-    await startCamera(id, w, h);
+    // recreate pose with latest options if already exists
+    if (poseInstance) {
+      try { poseInstance.close && poseInstance.close(); } catch(e){}
+      poseInstance = null;
+    }
+    await startCamera();
   });
   stopBtn.addEventListener('click', () => stopCamera());
 
-  // quick checks for common failure modes
+  // option changes should recreate Pose for quick experiments
+  [modelComplexityEl, minDetectEl, minTrackEl].forEach(el => {
+    el.addEventListener('change', () => {
+      log('Model option changed — restart camera to apply');
+    });
+  });
+
+  // small console dump button
+  document.getElementById('dumpConsole').addEventListener('click', () => {
+    alert(logEl.textContent.slice(0, 20000) || 'no logs');
+  });
+
+  // initial enumerate
   (async function init(){
-    dumpConsole('Initializing debug page.');
+    log('Debug page ready. Enumerating cameras...');
     await enumerateCameras();
+    // pick first
     if (cameraSelect.options.length > 0) cameraSelect.selectedIndex = 0;
-    // warn if opened via file://
-    if (location.protocol === 'file:') {
-      dumpConsole('WARNING: Page opened via file:// — MediaPipe assets may fail to load. Please serve over http://localhost:8000 or similar.');
-    }
-    // show whether drawConnectors exists
-    drawAvailableEl.innerText = (typeof window.drawConnectors === 'function') ? 'yes' : 'no';
-    // small timeout: if no onResults called within 2s after starting camera, warn
-    setInterval(() => {
-      if (!running) return;
-      if (Date.now() - lastFoundAt > 3000) {
-        dumpConsole('No pose landmarks detected in the last ~3s. Possible causes: model not loaded, occlusion, or camera not providing frames to MediaPipe.');
-      }
-    }, 4000);
   })();
 
-  // expose some debugging helpers to console
-  window.__mp_debug = { pose, startCamera, stopCamera, enumerateCameras };
-  </script>
+  // expose debug handles
+  window.__mp_debug = { startCamera, stopCamera, makePoseInstance };
+</script>
 </body>
 </html>
